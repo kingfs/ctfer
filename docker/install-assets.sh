@@ -293,6 +293,7 @@ if [ "$WITH_GHIDRA" = "1" ]; then
   gdir="$(dirname "$(dirname "$gpath")")"
   mv "$gdir" "$OUT/opt/ghidra"
   chmod 0755 "$OUT/opt/ghidra/support/analyzeHeadless"
+  chmod 0755 "$OUT/opt/ghidra/support/"*.sh "$OUT/opt/ghidra/ghidraRun" 2>/dev/null || true
   # Docs/API sources are large and never used at runtime.
   rm -rf "$OUT/opt/ghidra/docs" "$OUT/opt/ghidra/Ghidra/Features"/*/src 2>/dev/null || true
 fi

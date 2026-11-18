@@ -181,7 +181,7 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       imagemagick zbar-tools qrencode \
       radare2 qemu-user qemu-user-static qemu-system-x86 \
       hashcat john pari-gp gmp-ecm singular bc \
-      sqlmap nikto whatweb gobuster checksec php-cli" \
+      python3 python3-venv python3-dev sqlmap nikto whatweb gobuster checksec php-cli" \
  && if [ "${WITH_RUBY}" = "1" ]; then pkgs="$pkgs ruby ruby-dev"; fi \
  && apt-get install -y --no-install-recommends $pkgs \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
