@@ -18,6 +18,9 @@ log() { printf '\n==> %s\n' "$*"; }
 
 # Debian/Ubuntu rename these binaries.
 ln -sf /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
+if ! command -v upx >/dev/null 2>&1 && [ -x /usr/bin/upx-ucl ]; then
+  ln -sf /usr/bin/upx-ucl /usr/local/bin/upx
+fi
 
 # ---------------------------------------------------------------------------
 # Ruby tools (pwn / forensics / AD)

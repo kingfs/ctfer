@@ -171,6 +171,7 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       libssl3t64 libffi8 libgmp10 libmpfr6 libmpc3 libxml2 libxslt1.1 \
       zlib1g libmagic1t64 libpcap0.8t64 libgomp1 libkrb5-dev libsasl2-dev \
       libffi-dev libseccomp-dev zlib1g-dev libyaml-dev libssl-dev \
+      libreadline-dev libedit-dev \
       libimage-exiftool-perl \
       openssl sqlite3 redis-tools mariadb-client postgresql-client \
       nmap masscan tcpdump tshark \
@@ -197,10 +198,14 @@ COPY --from=assets /out/seclists/ /opt/seclists/
 COPY --from=assets /out/nuclei-templates/ /opt/nuclei-templates/
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=node /usr/local/bin/npx /usr/local/bin/npx
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=node /usr/local/include/node /usr/local/include/node
+
+# COPY dereferences the npm/npx symlinks from the Node image, which breaks
+# their relative require('../lib/cli.js'). Recreate them explicitly.
+RUN rm -f /usr/local/bin/npm /usr/local/bin/npx \
+ && ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+ && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # --- agent CLIs, wrappers, Playwright, final cleanup -----------------------
 COPY TOOLS.md /opt/ctf/TOOLS.md

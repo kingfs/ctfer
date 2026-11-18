@@ -202,8 +202,15 @@ if [ "$TARGETARCH" = "amd64" ]; then
   if fetch_release RickdeJager/stegseek "stegseek_.*\\.deb$" "$tmp/stegseek.deb"; then
     mkdir -p "$tmp/stegseek"
     dpkg-deb -x "$tmp/stegseek.deb" "$tmp/stegseek"
-    install -m 0755 "$tmp/stegseek/usr/bin/stegseek" "$OUT/bin/stegseek" \
-      || warn "stegseek extract failed"
+    spath=""
+    for cand in "$tmp/stegseek/usr/local/bin/stegseek" "$tmp/stegseek/usr/bin/stegseek"; do
+      [ -f "$cand" ] && spath="$cand" && break
+    done
+    if [ -n "$spath" ]; then
+      install -m 0755 "$spath" "$OUT/bin/stegseek"
+    else
+      warn "stegseek extract failed"
+    fi
   else
     warn "stegseek skipped"
   fi
@@ -308,7 +315,7 @@ fetch_repo swisskyrepo/SSRFmap "$OUT/opt/SSRFmap" || true
 fetch_repo vladko312/SSTImap "$OUT/opt/SSTImap" || true
 fetch_repo ticarpi/jwt_tool "$OUT/opt/jwt_tool" || true
 fetch_repo commixproject/commix "$OUT/opt/commix" || true
-fetch_repo ldsec/Enum4linux-ng "$OUT/opt/enum4linux-ng" || true
+fetch_repo cddmp/enum4linux-ng "$OUT/opt/enum4linux-ng" || true
 fetch_repo dolevf/graphw00f "$OUT/opt/graphw00f" || true
 fetch_repo ambionics/phpggc "$OUT/opt/phpggc" || true
 fetch_repo jvdsn/crypto-attacks "$OUT/opt/crypto-attacks" || true
