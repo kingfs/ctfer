@@ -46,7 +46,7 @@ mods = [
     "pwn", "angr", "z3", "sympy", "gmpy2", "Crypto", "capstone", "unicorn",
     "keystone", "ropper", "lief", "scapy", "yara", "pefile", "magic",
     "PIL", "qrcode", "androguard", "pexpect", "volatility3", "mitmproxy",
-    "semgrep", "impacket", "certipy", "ldap3", "fpylll", "flint",
+    "impacket", "certipy", "ldap3", "fpylll", "flint",
 ]
 missing = []
 for mod in mods:
@@ -99,7 +99,8 @@ fi
 
 if [ "${WITH_PLAYWRIGHT:-1}" = "1" ]; then
   echo "== playwright =="
-  if find /opt/playwright -type f -name headless_shell 2>/dev/null | grep -q .; then
+  # Playwright >= 1.50 uses Chrome for Testing's chrome-headless-shell binary.
+  if find /opt/playwright -type f \( -name headless_shell -o -name chrome-headless-shell \) 2>/dev/null | grep -q .; then
     printf 'ok   playwright chromium headless shell\n'
   else
     echo 'MISS playwright chromium headless shell'

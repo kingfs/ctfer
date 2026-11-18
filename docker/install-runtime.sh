@@ -21,6 +21,11 @@ ln -sf /usr/bin/fdfind /usr/local/bin/fd 2>/dev/null || true
 if ! command -v upx >/dev/null 2>&1 && [ -x /usr/bin/upx-ucl ]; then
   ln -sf /usr/bin/upx-ucl /usr/local/bin/upx
 fi
+# Ubuntu ships Singular with a capital S; provide the conventional lowercase
+# command as well.
+if [ -x /usr/bin/Singular ]; then
+  ln -sf /usr/bin/Singular /usr/local/bin/singular
+fi
 
 # ---------------------------------------------------------------------------
 # Ruby tools (pwn / forensics / AD)
@@ -169,10 +174,11 @@ npm install -g --no-fund --no-audit --loglevel=error \
   "pnpm@${PNPM_VERSION}"
 npm cache clean --force >/dev/null 2>&1 || true
 
-# AWS CLI is installed in an isolated uv tool environment: its pinned
-# urllib3/botocore versions must not constrain the main CTF venv.
+# AWS CLI and semgrep are installed in isolated uv tool environments: their
+# pinned protobuf/urllib3 versions would otherwise break angr and the main venv.
 if command -v uv >/dev/null 2>&1; then
   uv tool install --python /usr/bin/python3 awscli || warn "awscli install failed"
+  uv tool install --python /usr/bin/python3 semgrep || warn "semgrep install failed"
 fi
 
 # ---------------------------------------------------------------------------

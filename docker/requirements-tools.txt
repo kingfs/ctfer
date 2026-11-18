@@ -21,6 +21,7 @@ r2pipe>=1.9,<3
 pycryptodome>=3.20,<5
 pycryptodomex>=3.20,<4
 fpylll>=0.6,<1
+cysignals>=1.11,<2
 
 # --- crypto ----------------------------------------------------------------
 python-flint>=0.6,<1
@@ -33,7 +34,6 @@ httpx>=0.28,<1
 beautifulsoup4>=4.13,<5
 lxml>=6,<7
 mitmproxy>=11,<14
-semgrep>=1.90,<2
 wafw00f>=2.2,<3
 arjun>=2.2,<3
 clairvoyance>=2.0,<3
