@@ -21,7 +21,7 @@ r2pipe>=1.9,<3
 pycryptodome>=3.20,<5
 pycryptodomex>=3.20,<4
 fpylll>=0.6,<1
-cysignals>=1.11,<2
+cysignals>=1.11,<1.13  # 1.13.x has no cp312 wheel; 1.12.6 does
 
 # --- crypto ----------------------------------------------------------------
 python-flint>=0.6,<1
