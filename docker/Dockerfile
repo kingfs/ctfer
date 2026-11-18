@@ -172,14 +172,14 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       zlib1g libmagic1t64 libpcap0.8t64 libgomp1 libkrb5-dev libsasl2-dev \
       libffi-dev libseccomp-dev zlib1g-dev libyaml-dev libssl-dev \
       libimage-exiftool-perl \
-      openssl sqlite3 redis-tools mariadb-client postgresql-client awscli \
+      openssl sqlite3 redis-tools mariadb-client postgresql-client \
       nmap masscan tcpdump tshark \
       openvpn wireguard-tools proxychains4 \
       smbclient ldap-utils snmp swaks sngrep mosquitto-clients \
       yara sleuthkit foremost testdisk ewf-tools hashdeep ssdeep \
       steghide pngcheck sox ffmpeg qpdf poppler-utils \
       imagemagick zbar-tools qrencode \
-      radare2 qemu-user qemu-user-static qemu-system-x86 \
+      radare2 qemu-user qemu-system-x86 \
       hashcat john pari-gp gmp-ecm singular bc \
       python3 python3-venv python3-dev sqlmap nikto whatweb gobuster checksec php-cli" \
  && if [ "${WITH_RUBY}" = "1" ]; then pkgs="$pkgs ruby ruby-dev"; fi \

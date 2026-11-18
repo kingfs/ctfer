@@ -166,6 +166,12 @@ npm install -g --no-fund --no-audit --loglevel=error \
   "pnpm@${PNPM_VERSION}"
 npm cache clean --force >/dev/null 2>&1 || true
 
+# AWS CLI is installed in an isolated uv tool environment: its pinned
+# urllib3/botocore versions must not constrain the main CTF venv.
+if command -v uv >/dev/null 2>&1; then
+  uv tool install --python /usr/bin/python3 awscli || warn "awscli install failed"
+fi
+
 # ---------------------------------------------------------------------------
 # Discovery helpers
 # ---------------------------------------------------------------------------
