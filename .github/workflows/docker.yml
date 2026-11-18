@@ -1,0 +1,162 @@
+name: docker
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Extra tag for this manual build"
+        type: string
+        default: "test"
+      push_image:
+        description: "Push the built image to Docker Hub"
+        type: boolean
+        default: false
+      with_ghidra:
+        description: "Include Ghidra (large, but the main reverse-engineering tool)"
+        type: choice
+        options:
+          - "1"
+          - "0"
+        default: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
+
+env:
+  GO_VERSION: "1.27.4"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: ShellCheck
+        run: shellcheck docker/*.sh scripts/*.sh
+
+      - name: Dockerfile check
+        run: |
+          docker buildx build \
+            --check \
+            --platform linux/amd64 \
+            --file docker/Dockerfile \
+            docker
+
+  build:
+    name: build-and-push
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/ctfer
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check Docker Hub repository
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DH_USER" ] || [ -z "$DH_TOKEN" ]; then
+            echo "::error::DOCKERHUB_USERNAME and DOCKERHUB_TOKEN must be configured"
+            exit 1
+          fi
+          echo "image: $IMAGE_NAME"
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          sudo apt-get clean
+          df -h /
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ inputs.image_tag || 'test' }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=sha,format=short,prefix=sha-
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build linux/amd64 image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GO_VERSION=${{ env.GO_VERSION }}
+            WITH_GHIDRA=${{ inputs.with_ghidra || '1' }}
+            WITH_PLAYWRIGHT=1
+            WITH_JAVA=1
+            WITH_RUBY=1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+          provenance: false
+          sbom: false
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          image="$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n1)"
+          echo "image: ${image}"
+          docker image inspect "${image}" --format 'uncompressed size: {{.Size}} bytes'
+          docker run --rm "${image}" ctf-selftest
+          docker run --rm "${image}" bash -lc '
+            set -e
+            node -v
+            npm -v
+            pnpm -v
+            bun --version
+            go version
+            python3 -V
+            uv --version
+            pi --version
+            codex --version
+            dsh --version
+          '
+
+      - name: Push image
+        if: github.event_name == 'push' || inputs.push_image
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            [ -n "${tag}" ] || continue
+            echo "::group::docker push ${tag}"
+            docker push "${tag}"
+            echo "::endgroup::"
+          done
