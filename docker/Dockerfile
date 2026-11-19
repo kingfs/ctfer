@@ -35,7 +35,7 @@ RUN apt-get update \
 # ===========================================================================
 FROM download-base AS assets
 
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 ARG GITHUB_MIRROR=""
 ARG WITH_GHIDRA=1
 ARG WITH_JAVA=1
@@ -66,7 +66,7 @@ RUN chmod 0755 /usr/local/bin/install-assets.sh \
 # ===========================================================================
 FROM download-base AS golang
 
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 ARG GO_VERSION
 
 RUN case "${TARGETARCH}" in \
@@ -121,7 +121,7 @@ FROM ${NODE_IMAGE} AS node
 # ===========================================================================
 FROM download-base AS runtime
 
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 ARG WITH_JAVA=1
 ARG WITH_RUBY=1
 ARG WITH_PLAYWRIGHT=1

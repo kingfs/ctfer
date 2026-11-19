@@ -27,8 +27,8 @@ WITH_KNOWLEDGE="${WITH_KNOWLEDGE:-1}"
 CRAFT_VERSION="${CRAFT_VERSION:-0.6.1}"
 
 case "$TARGETARCH" in
-  amd64) ARCH=amd64; ARCH_X=x86_64; BUN_ARCH=x64; JDK_ARCH=x64; GL_ARCH=x64 ;;
-  arm64) ARCH=arm64; ARCH_X=aarch64; BUN_ARCH=aarch64; JDK_ARCH=aarch64; GL_ARCH=arm64 ;;
+  amd64) ARCH=amd64; ARCH_X=x86_64; BUN_ARCH=x64; JDK_ARCH=x64; GL_ARCH=x64; GRPCURL_ARCH=x86_64 ;;
+  arm64) ARCH=arm64; ARCH_X=aarch64; BUN_ARCH=aarch64; JDK_ARCH=aarch64; GL_ARCH=arm64; GRPCURL_ARCH=arm64 ;;
   *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;;
 esac
 
@@ -57,12 +57,12 @@ fetch() {
 
 latest_tag() {
   local repo="$1" tag
-  tag="$(curl -sSIL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 60 \
+  tag="$(curl -sSIL --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 \
     "https://github.com/${repo}/releases/latest" 2>/dev/null \
     | tr -d '\r' \
     | awk 'tolower($1)=="location:"{u=$2} END{sub(/.*\/tag\//,"",u); print u}')"
   if [ -z "$tag" ]; then
-    tag="$(curl -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 60 \
+    tag="$(curl -fsSL --retry 5 --retry-all-errors --connect-timeout 30 --max-time 180 \
       "https://github.com/${repo}/releases.atom" 2>/dev/null \
       | grep -o '<title>[^<]*</title>' | sed -n '2p' | sed 's#</\?title>##g')"
   fi
@@ -73,7 +73,8 @@ asset_url() {
   local repo="$1" pattern="$2" tag
   tag="$(latest_tag "$repo")"
   [ -n "$tag" ] || return 1
-  curl -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 60 \
+  curl -fsSL --retry 8 --retry-all-errors --retry-delay 3 \
+    --connect-timeout 30 --max-time 180 \
     "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null \
     | grep -oE 'href="[^"]*/releases/download/[^"]*"' \
     | sed 's/^href="//;s/"$//' \
@@ -181,7 +182,7 @@ fetch_release nicocha30/ligolo-ng "proxy_.*linux_${ARCH}\\.tar\\.gz$" "$tmp/ligo
   && install_tar_bin "$tmp/ligolo-proxy.tar.gz" proxy ligolo-proxy || warn "ligolo-proxy skipped"
 install_raw_bin zema1/suo5 "suo5-linux-${ARCH}$" suo5 || warn "suo5 skipped"
 install_raw_bin vi/websocat "websocat\\.${ARCH_X}-unknown-linux-musl$" websocat || warn "websocat skipped"
-fetch_release fullstorydev/grpcurl "linux_${ARCH}\\.tar\\.gz$" "$tmp/grpcurl.tar.gz" \
+fetch_release fullstorydev/grpcurl "linux_${GRPCURL_ARCH}\\.tar\\.gz$" "$tmp/grpcurl.tar.gz" \
   && install_tar_bin "$tmp/grpcurl.tar.gz" grpcurl || warn "grpcurl skipped"
 
 log "interactsh-client / mc / gitleaks / kerbrute"

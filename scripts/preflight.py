@@ -225,8 +225,10 @@ ASSET_RE = re.compile(
     r"(?:fetch_release|install_raw_bin)\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\s+\"([^\"]+)\""
 )
 ARCH_SUBS = {
-    "amd64": {"ARCH": "amd64", "ARCH_X": "x86_64", "BUN_ARCH": "x64"},
-    "arm64": {"ARCH": "arm64", "ARCH_X": "aarch64", "BUN_ARCH": "aarch64"},
+    "amd64": {"ARCH": "amd64", "ARCH_X": "x86_64", "BUN_ARCH": "x64",
+              "GL_ARCH": "x64", "GRPCURL_ARCH": "x86_64"},
+    "arm64": {"ARCH": "arm64", "ARCH_X": "aarch64", "BUN_ARCH": "aarch64",
+              "GL_ARCH": "arm64", "GRPCURL_ARCH": "arm64"},
 }
 
 
@@ -293,6 +295,17 @@ def check_selftest() -> None:
         ok(f"all {len(tokens)} selftest tokens are in the manifest")
 
 
+def check_dockerfile_args() -> None:
+    """A default on TARGETARCH shadows BuildKit's injected platform value."""
+    print("\n== Dockerfile build args ==")
+    text = (DOCKER / "Dockerfile").read_text()
+    bad = re.findall(r"^ARG (TARGETARCH|TARGETPLATFORM|TARGETOS|TARGETVARIANT)=.+$", text, re.M)
+    if bad:
+        fail(f"auto platform ARG(s) must be declared without a default: {', '.join(bad)}")
+    else:
+        ok("platform ARGs are declared without defaults")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch", choices=("amd64", "arm64", "both"), default="amd64")
@@ -305,6 +318,7 @@ def main() -> int:
     )
     print(f"preflight for {ROOT} (arch: {', '.join(arches)})")
 
+    check_dockerfile_args()
     check_apt(arches, args.strict_arm64)
     check_python()
     check_npm()
