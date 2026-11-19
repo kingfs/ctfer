@@ -1,14 +1,14 @@
 # Extra Python CTF libraries, installed one-by-one into /opt/venv by
 # install-runtime.sh.
 #
+# NOTE: chepy is NOT listed here. It pins pyOpenSSL 23.2.0 (cryptography<42) or
+# pyjwt 1.7.1, so installing it into the main venv downgrades cryptography and
+# breaks the core stack. It is installed as an isolated `uv tool` instead.
+#
 # These are deliberately not in requirements-tools.txt: they pull larger or more
 # volatile dependency trees, and a resolver hiccup here must not break the core
 # pwn/crypto stack (pwntools, angr, z3). Each line is installed separately and
 # warn-only, so one bad pin cannot take the others down with it.
-
-# Python port of CyberChef: chained encode/decode/crypto/forensics operations.
-# Preinstalled by the NYU D-CIPHER agent environment.
-chepy>=4,<8
 
 # Python pickle (de)serialization analysis and exploitation.
 fickling>=0.1,<1

@@ -209,6 +209,14 @@ categories:
       version: '8.3'
       commands:
       - php
+    - name: protobuf
+      kind: toolchain
+      description: Protocol Buffers 编译器；逆向/构造 protobuf 协议用。
+      commands:
+      - protoc
+      package: protobuf-compiler
+      also_in:
+      - reverse
     - name: clang-llvm
       kind: toolchain
       description: Clang/LLVM 工具链；提供 libFuzzer、ASan/UBSan，用于编译 fuzz harness。
@@ -655,6 +663,24 @@ categories:
       commands:
       - apktool
       path: /opt/apktool.jar
+    - name: apksigner
+      kind: cli
+      description: APK 签名/校验；重打包后签名用。
+      commands:
+      - apksigner
+      optional: true
+    - name: zipalign
+      kind: cli
+      description: APK 对齐优化；重打包后对齐用。
+      commands:
+      - zipalign
+      optional: true
+    - name: jdwp-shellifier
+      kind: cli
+      description: JDWP 调试端口利用（Java 远程调试 RCE）。
+      commands:
+      - jdwp-shellifier
+      optional: true
     - name: dex2jar
       kind: cli
       description: DEX -> JAR 转换。
@@ -1172,6 +1198,7 @@ categories:
       description: NetExec（nxc）— SMB/LDAP/WinRM/MSSQL 等协议的一体化 AD 工具。
       commands:
       - nxc
+      - netexec
       path: /opt/uv-tools/netexec
       package: netexec
       optional: true

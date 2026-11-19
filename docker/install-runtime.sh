@@ -287,6 +287,9 @@ if command -v uv >/dev/null 2>&1; then
     || warn "netexec install failed"
   uv tool install --python /usr/bin/python3 bloodyad || warn "bloodyad install failed"
   uv tool install --python /usr/bin/python3 coercer || warn "coercer install failed"
+  # chepy pins pyOpenSSL/pyjwt versions that would downgrade the main venv's
+  # cryptography, so it gets its own environment (CLI only, no `import chepy`).
+  uv tool install --python /usr/bin/python3 chepy || warn "chepy install failed"
 fi
 
 # Extra Python CTF libraries (kept out of requirements-tools.txt so a resolver
@@ -294,11 +297,16 @@ fi
 # time: a single bad pin must not prevent the others from being installed.
 if [ -f /tmp/requirements-extra.txt ]; then
   log "Extra Python tools"
+  # Constrain against what the core image already resolved, so an extra can
+  # never silently downgrade crypto/HTTP primitives the rest of the image needs.
+  /opt/venv/bin/pip freeze 2>/dev/null \
+    | grep -iE '^(cryptography|pyjwt|pyopenssl|urllib3|requests|protobuf|numpy|pillow)==' \
+    > /tmp/core-constraints.txt || true
   while IFS= read -r spec; do
     case "$spec" in
       ''|'#'*) continue ;;
     esac
-    /opt/venv/bin/pip install --no-compile "$spec" \
+    /opt/venv/bin/pip install --no-compile -c /tmp/core-constraints.txt "$spec" \
       || warn "pip install failed: $spec"
   done < <(sed 's/[[:space:]]*#.*$//' /tmp/requirements-extra.txt)
   rm -f /tmp/requirements-extra.txt
