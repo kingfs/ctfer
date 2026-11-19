@@ -94,9 +94,13 @@ RUN apt-get update \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* /tmp/*
 
 COPY requirements-tools.txt /tmp/requirements-tools.txt
+# The Python httpx console script is removed: /opt/venv/bin comes first on
+# PATH and would otherwise shadow the ProjectDiscovery httpx binary from the
+# assets stage. The httpx *library* remains importable.
 RUN python3 -m venv /opt/venv \
  && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
  && /opt/venv/bin/pip install --no-compile -r /tmp/requirements-tools.txt \
+ && rm -f /opt/venv/bin/httpx \
  && find /opt/venv -type d -name '__pycache__' -prune -exec rm -rf '{}' + \
  && find /opt/venv -name '*.pyc' -delete \
  && rm -rf /tmp/requirements-tools.txt /root/.cache /root/.cache/pip
@@ -142,6 +146,7 @@ ENV LANG=C.UTF-8 \
     JAVA_HOME=/opt/jdk-25 \
     UV_TOOL_DIR=/opt/uv-tools \
     UV_TOOL_BIN_DIR=/usr/local/bin \
+    SEMGREP_ENABLE_VERSION_CHECK=0 \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
@@ -176,7 +181,7 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       openssl sqlite3 redis-tools mariadb-client postgresql-client \
       nmap masscan tcpdump tshark \
       openvpn wireguard-tools proxychains4 \
-      smbclient ldap-utils snmp swaks sngrep mosquitto-clients \
+      smbclient samba-common-bin ldap-utils snmp swaks sngrep mosquitto-clients \
       yara sleuthkit foremost testdisk ewf-tools hashdeep ssdeep \
       steghide pngcheck sox ffmpeg qpdf poppler-utils \
       imagemagick zbar-tools qrencode \

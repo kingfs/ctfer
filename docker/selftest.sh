@@ -28,6 +28,7 @@ for t in python3 pip node npm pnpm bun go \
          sqlmap nikto whatweb gobuster ffuf feroxbuster httpx nuclei \
          subfinder katana jq yq rg fd file binwalk patchelf objdump readelf \
          strings socat nc curl git openssl sqlite3 steghide exiftool \
+         smbclient rpcclient \
          gcc g++ make nasm r2 hashcat john gp ecm singular \
          checksec ROPgadget vol \
          pwninit chisel websocat grpcurl \
@@ -45,6 +46,43 @@ fi
 
 if [ -f /opt/gef.py ]; then
   need gdb-gef
+fi
+
+echo "== functional checks =="
+if command -v httpx >/dev/null 2>&1; then
+  if httpx -version 2>&1 | grep -qi 'projectdiscovery'; then
+    printf 'ok   httpx (ProjectDiscovery)\n'
+  else
+    printf 'MISS httpx resolves to %s, not ProjectDiscovery\n' "$(command -v httpx)"
+    missing=1
+  fi
+fi
+
+if command -v dirsearch >/dev/null 2>&1; then
+  if dirsearch --help >/dev/null 2>&1; then
+    printf 'ok   dirsearch\n'
+  else
+    printf 'MISS dirsearch --help failed (pkg_resources missing?)\n'
+    missing=1
+  fi
+fi
+
+if command -v impacket-smbserver >/dev/null 2>&1; then
+  if impacket-smbserver -h >/dev/null 2>&1; then
+    printf 'ok   impacket-smbserver\n'
+  else
+    printf 'MISS impacket-smbserver -h failed\n'
+    missing=1
+  fi
+fi
+
+if command -v enum4linux-ng >/dev/null 2>&1; then
+  if enum4linux-ng -h 2>&1 | grep -q 'dependend tools are missing'; then
+    printf 'MISS enum4linux-ng: missing net/nmblookup (install samba-common-bin)\n'
+    missing=1
+  else
+    printf 'ok   enum4linux-ng deps\n'
+  fi
 fi
 
 echo "== python modules =="

@@ -4,6 +4,10 @@
 # want compatible upstream fixes without silently crossing a major version.
 # `uv pip compile` is used in CI to check that the whole set still resolves.
 
+# dirsearch 0.4.x imports pkg_resources at runtime, which newer setuptools
+# releases no longer ship. Keep a setuptools that still provides it.
+setuptools<81
+
 # --- pwn / reversing -------------------------------------------------------
 pwntools>=4.15,<5
 angr>=10,<11

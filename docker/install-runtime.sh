@@ -120,47 +120,48 @@ if [ -f /opt/phpggc/phpggc ]; then
   ln -sf /opt/phpggc/phpggc /usr/local/bin/phpggc
 fi
 
-# The PyPI impacket wheel ships the library but no console scripts in some
-# releases. Provide the conventional impacket-* entry points explicitly.
+# impacket 0.13.x installs its example CLIs as standalone .py files in
+# /opt/venv/bin instead of importable impacket.examples.<name> modules. Prefer
+# those scripts and fall back to nothing if an example is not shipped.
 if python3 -c 'import impacket' >/dev/null 2>&1; then
-  while read -r mod bin; do
-    [ -n "$mod" ] || continue
+  while read -r script bin; do
+    [ -n "$script" ] || continue
+    if [ ! -f "/opt/venv/bin/${script}" ]; then
+      warn "impacket example ${script} not found; skipping ${bin}"
+      continue
+    fi
     cat >"/usr/local/bin/${bin}" <<EOF
 #!/bin/sh
-exec python3 -m impacket.examples.${mod} "\$@"
+exec /opt/venv/bin/python3 "/opt/venv/bin/${script}" "\$@"
 EOF
     chmod 0755 "/usr/local/bin/${bin}"
   done <<'IMPACKET'
-smbserver impacket-smbserver
-secretsdump impacket-secretsdump
-psexec impacket-psexec
-wmiexec impacket-wmiexec
-smbexec impacket-smbexec
-atexec impacket-atexec
-dcomexec impacket-dcomexec
-smbclient impacket-smbclient
-rpcdump impacket-rpcdump
-samrdump impacket-samrdump
-lookupsid impacket-lookupsid
-getNPUsers impacket-GetNPUsers
-getUserSPNs impacket-GetUserSPNs
-ntlmrelayx impacket-ntlmrelayx
-ticketer impacket-ticketer
-goldenPac impacket-goldenPac
-raiseChild impacket-raiseChild
-mssqlclient impacket-mssqlclient
-mssqlinstance impacket-mssqlinstance
-dpapi impacket-dpapi
-netview impacket-netview
-regsecrets impacket-regsecrets
-services impacket-services
-ifmap impacket-ifmap
-ping impacket-ping
-opdump impacket-opdump
-karmaSMB impacket-karmaSMB
-ntfsread impacket-ntfsread
-sniff impacket-sniff
-split impacket-split
+smbserver.py impacket-smbserver
+secretsdump.py impacket-secretsdump
+psexec.py impacket-psexec
+wmiexec.py impacket-wmiexec
+smbexec.py impacket-smbexec
+atexec.py impacket-atexec
+dcomexec.py impacket-dcomexec
+smbclient.py impacket-smbclient
+rpcdump.py impacket-rpcdump
+samrdump.py impacket-samrdump
+lookupsid.py impacket-lookupsid
+GetNPUsers.py impacket-GetNPUsers
+GetUserSPNs.py impacket-GetUserSPNs
+ntlmrelayx.py impacket-ntlmrelayx
+ticketer.py impacket-ticketer
+goldenPac.py impacket-goldenPac
+raiseChild.py impacket-raiseChild
+mssqlclient.py impacket-mssqlclient
+mssqlinstance.py impacket-mssqlinstance
+dpapi.py impacket-dpapi
+netview.py impacket-netview
+regsecrets.py impacket-regsecrets
+services.py impacket-services
+ping.py impacket-ping
+karmaSMB.py impacket-karmaSMB
+ntfs-read.py impacket-ntfsread
 IMPACKET
 fi
 

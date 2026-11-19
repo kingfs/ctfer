@@ -50,7 +50,7 @@ Agents should query the manifest before installing a replacement tool.
 |---|---|
 | `pi` | Pi coding agent (`@earendil-works/pi-coding-agent`) |
 | `codex` | OpenAI Codex CLI (`@openai/codex`) |
-| `dsh` | DeepSeek Harness (`@deepseek-ai/dsh`); `dsh web --host 0.0.0.0 --port 3080 --no-open` |
+| `dsh` | DeepSeek Harness (`@deepseek-ai/dsh`); `dsh web --host "$(hostname -i)" --port 3080 --no-open` (0.2.2 rejects `0.0.0.0`) |
 
 API keys are **not** baked into the image. Pass them at runtime, e.g.
 `-e OPENAI_API_KEY=...`, `-e DEEPSEEK_API_KEY=...`, or configure each CLI

@@ -80,5 +80,6 @@ for command names, paths, Python modules and optional/absent tools.
 serve its Web UI:
 
 ```sh
-dsh web --host 0.0.0.0 --port 3080 --no-open
+# DSH 0.2.2+ rejects wildcard binds; bind the container's interface address.
+dsh web --host "$(hostname -i | cut -d" " -f1)" --port 3080 --no-open
 ```

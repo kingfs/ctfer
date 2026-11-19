@@ -19,17 +19,19 @@ docker run --rm -it -v "$PWD:/work" kingfs/ctfer:latest
 # 工具目录 / 自检
 docker run --rm kingfs/ctfer:latest ctf-tools
 docker run --rm kingfs/ctfer:latest ctf-selftest
-# 机器可读组件清单（下一次 tag 构建后可用）
-# docker run --rm kingfs/ctfer:latest ctf-manifest pwn
+# 机器可读组件清单（v0.1.2+）
+docker run --rm kingfs/ctfer:latest ctf-manifest pwn
 
 # 三个 agent harness（API key 运行时注入，不打进镜像）
 docker run --rm -it -v "$PWD:/work" -e OPENAI_API_KEY kingfs/ctfer:latest pi
 docker run --rm -it -v "$PWD:/work" -e OPENAI_API_KEY kingfs/ctfer:latest codex
 docker run --rm -it -v "$PWD:/work" -e DEEPSEEK_API_KEY kingfs/ctfer:latest dsh
 
-# DSH Web UI
+# DSH Web UI（DSH 0.2.2 拒绝 0.0.0.0，需绑定容器 eth0 地址后再用 -p 发布）
 docker run --rm -p 3080:3080 -e DEEPSEEK_API_KEY \
-  kingfs/ctfer:latest dsh web --host 0.0.0.0 --port 3080 --no-open
+  kingfs/ctfer:latest \
+  bash -lc 'exec dsh web --host "$(hostname -i | cut -d" " -f1)" --port 3080 --no-open --public-url http://127.0.0.1:3080'
+# 然后打开日志中打印的 http://127.0.0.1:3080/?token=... 链接
 ```
 
 镜像以 `root` 运行，`/work` 是默认工作目录；它只是工具集合，不是安全边界。
@@ -65,9 +67,9 @@ ctf-manifest json | jq               # 机器可读 JSON
 | `data` | SecLists、rockyou、nuclei 模板、Playwright 浏览器 |
 | `helpers` | `ctf-manifest`、`ctf-tools`、`ctf-selftest` |
 
-> 说明：manifest 与 `ctf-manifest` 是本次新增内容，会在**下一次打 tag 构建**后
-> 进入镜像；当前已发布的 `v0.1.1` 只有 `ctf-tools` / `ctf-selftest`。不重建镜像时，
-> 也可以直接阅读仓库里的 [`docker/MANIFEST.yaml`](docker/MANIFEST.yaml)。
+> 说明：manifest 与 `ctf-manifest` 自 `v0.1.2` 起随镜像发布；更早的 `v0.1.1`
+> 只有 `ctf-tools` / `ctf-selftest`。不重建镜像时，也可以直接阅读仓库里的
+> [`docker/MANIFEST.yaml`](docker/MANIFEST.yaml)。
 
 ## 发布流程
 
@@ -176,12 +178,14 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
 - **仅 amd64**：CTF 平台、大多数 pwn 题和 `gcc-multilib`/`qemu-system-x86` 都是 amd64 生态。
 - 不包含 SageMath、Metasploit、GPU hashcat、Windows RE 套件（体积/许可/驱动原因）。
   需要时在容器内用 `uv` / `pipx` / `npm` / `go install` 临时安装。
+- `john` 使用 Ubuntu 自带的 1.9.0（非 jumbo），仅支持 crypt(3) 类哈希；更多哈希格式
+  请用 `hashcat`，或在容器内自行安装 jumbo 版。
 - 工具版本来自各项目 **latest release**（agent CLI 与 Go 固定版本），
   因此不同时间构建的镜像不是逐字节可复现；如需固定，给 `install-assets.sh`
   增加版本变量即可。
 - Ghidra 12 需要 JDK 25；镜像从 Adoptium 下载 Temurin 25（Ubuntu 24.04 只有 21）。
 - 镜像不内置任何 API key、flag 或私有 token；所有密钥运行时注入。
-- `ctf-manifest` / `MANIFEST.yaml` 从下一次 tag 构建开始生效；v0.1.1 及更早镜像
+- `ctf-manifest` / `MANIFEST.yaml` 自 `v0.1.2` 起可用；`v0.1.1` 及更早镜像
   没有这两个文件。
 - 少数 source-clone 工具（如 `graphw00f`）属于 optional，缺失不影响核心自检。
 
