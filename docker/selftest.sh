@@ -31,9 +31,17 @@ for t in python3 pip node npm pnpm bun go \
          gcc g++ make nasm r2 hashcat john gp ecm singular \
          checksec ROPgadget vol \
          pwninit chisel websocat grpcurl \
-         pi codex dsh uv pipx semgrep mitmdump dirsearch; do
+         pi codex dsh uv pipx semgrep mitmdump dirsearch \
+         ctf-tools ctf-manifest; do
   need "$t"
 done
+
+if [ -f /opt/ctf/MANIFEST.yaml ] && ctf-manifest >/dev/null 2>&1; then
+  printf 'ok   /opt/ctf/MANIFEST.yaml (parsed by ctf-manifest)\n'
+else
+  echo 'MISS /opt/ctf/MANIFEST.yaml or ctf-manifest failed to parse it'
+  missing=1
+fi
 
 if [ -f /opt/gef.py ]; then
   need gdb-gef

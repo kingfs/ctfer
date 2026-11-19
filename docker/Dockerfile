@@ -209,13 +209,15 @@ RUN rm -f /usr/local/bin/npm /usr/local/bin/npx \
 
 # --- agent CLIs, wrappers, Playwright, final cleanup -----------------------
 COPY TOOLS.md /opt/ctf/TOOLS.md
+COPY MANIFEST.yaml /opt/ctf/MANIFEST.yaml
+COPY ctf-manifest /usr/local/bin/ctf-manifest
 COPY runtime-AGENTS.md /opt/ctf/AGENTS.md
 COPY selftest.sh /opt/ctf/selftest.sh
 COPY entrypoint.sh /usr/local/bin/ctfer-entrypoint
 COPY install-runtime.sh /usr/local/bin/install-runtime.sh
 
 RUN chmod 0755 /opt/ctf/selftest.sh /usr/local/bin/ctfer-entrypoint \
-              /usr/local/bin/install-runtime.sh \
+              /usr/local/bin/ctf-manifest /usr/local/bin/install-runtime.sh \
  && TARGETARCH="${TARGETARCH}" \
     WITH_JAVA="${WITH_JAVA}" \
     WITH_RUBY="${WITH_RUBY}" \

@@ -19,6 +19,8 @@ docker run --rm -it -v "$PWD:/work" kingfs/ctfer:latest
 # 工具目录 / 自检
 docker run --rm kingfs/ctfer:latest ctf-tools
 docker run --rm kingfs/ctfer:latest ctf-selftest
+# 机器可读组件清单（下一次 tag 构建后可用）
+# docker run --rm kingfs/ctfer:latest ctf-manifest pwn
 
 # 三个 agent harness（API key 运行时注入，不打进镜像）
 docker run --rm -it -v "$PWD:/work" -e OPENAI_API_KEY kingfs/ctfer:latest pi
@@ -32,6 +34,40 @@ docker run --rm -p 3080:3080 -e DEEPSEEK_API_KEY \
 
 镜像以 `root` 运行，`/work` 是默认工作目录；它只是工具集合，不是安全边界。
 请只在获得授权的目标上使用。
+
+## 组件清单（manifest）
+
+镜像内维护一份按功能分类的机器可读清单 `/opt/ctf/MANIFEST.yaml`，并提供
+`ctf-manifest` 查询命令：
+
+```bash
+ctf-manifest                         # 分类与数量
+ctf-manifest pwn                     # 某一类的组件、命令、路径
+ctf-manifest search jwt              # 按名称/命令/描述搜索
+ctf-manifest show gdb                # 查看完整条目
+ctf-manifest commands ad             # 只列命令名（TSV）
+ctf-manifest json | jq               # 机器可读 JSON
+```
+
+| 分类 | 内容 |
+|---|---|
+| `base` | OS、Python/Node/Go/JDK/Ruby、编译链、常用 CLI |
+| `harness` | `pi`、`codex`、`dsh` |
+| `web` | 目录/参数发现、注入、JWT、GraphQL、浏览器、源码审计 |
+| `pwn` | 调试、ELF/ROP、符号执行、qemu、32 位编译 |
+| `reverse` | Ghidra、jadx、apktool、dex2jar、androguard、ysoserial |
+| `crypto` | z3/sympy/gmpy2/fpylll、PARI/GP、RsaCtfTool、hashcat/john |
+| `forensics` | 流量、内存、磁盘、文档、固件 |
+| `stego` | 图片/音频/二维码隐写 |
+| `network` | 扫描、连接、VPN、代理、隧道 |
+| `ad` | impacket、certipy、bloodhound、evil-winrm、SMB/LDAP |
+| `cloud` | kubectl、aws |
+| `data` | SecLists、rockyou、nuclei 模板、Playwright 浏览器 |
+| `helpers` | `ctf-manifest`、`ctf-tools`、`ctf-selftest` |
+
+> 说明：manifest 与 `ctf-manifest` 是本次新增内容，会在**下一次打 tag 构建**后
+> 进入镜像；当前已发布的 `v0.1.1` 只有 `ctf-tools` / `ctf-selftest`。不重建镜像时，
+> 也可以直接阅读仓库里的 [`docker/MANIFEST.yaml`](docker/MANIFEST.yaml)。
 
 ## 发布流程
 
@@ -117,8 +153,11 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
 ```text
 .
 ├── .github/workflows/docker.yml   # tag -> 构建 -> 烟测 -> 推送
+├── AGENTS.md                      # 仓库维护 agent 指南
 ├── docker/
 │   ├── Dockerfile                 # 多阶段构建
+│   ├── MANIFEST.yaml              # 机器可读组件清单（source of truth）
+│   ├── ctf-manifest               # 清单查询 CLI（ctf-manifest）
 │   ├── install-assets.sh          # GitHub Releases / 数据文件
 │   ├── install-runtime.sh         # gem、wrapper、Playwright、agent CLI
 │   ├── requirements-tools.txt     # Python CTF 工具链
@@ -142,6 +181,9 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
   增加版本变量即可。
 - Ghidra 12 需要 JDK 25；镜像从 Adoptium 下载 Temurin 25（Ubuntu 24.04 只有 21）。
 - 镜像不内置任何 API key、flag 或私有 token；所有密钥运行时注入。
+- `ctf-manifest` / `MANIFEST.yaml` 从下一次 tag 构建开始生效；v0.1.1 及更早镜像
+  没有这两个文件。
+- 少数 source-clone 工具（如 `graphw00f`）属于 optional，缺失不影响核心自检。
 
 ## 安全与合规
 

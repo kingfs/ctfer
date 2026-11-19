@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# Query the ctfer component manifest.
+#
+# Usage:
+#   ctf-manifest                         category summary
+#   ctf-manifest <category>              components in one category
+#   ctf-manifest search <term>           search names/commands/descriptions
+#   ctf-manifest show <name>             full manifest entry (YAML)
+#   ctf-manifest commands [category]     all command names as TSV
+#   ctf-manifest json                    full manifest as JSON
+#   ctf-manifest raw                     raw YAML
+set -euo pipefail
+
+if [ -n "${CTF_MANIFEST:-}" ]; then
+  manifest="$CTF_MANIFEST"
+elif [ -f /opt/ctf/MANIFEST.yaml ]; then
+  manifest=/opt/ctf/MANIFEST.yaml
+else
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  manifest="${script_dir}/MANIFEST.yaml"
+fi
+
+if [ ! -f "$manifest" ]; then
+  echo "ctf-manifest: manifest not found: $manifest" >&2
+  exit 1
+fi
+
+exec python3 - "$manifest" "$@" <<'PY'
+import json
+import sys
+
+try:
+    import yaml
+except ImportError:
+    print("ctf-manifest: PyYAML is required (python3 -m pip install pyyaml)", file=sys.stderr)
+    raise SystemExit(1)
+
+path = sys.argv[1]
+args = sys.argv[2:]
+
+with open(path, encoding="utf-8") as fh:
+    data = yaml.safe_load(fh)
+
+image = data.get("image", {})
+categories = data.get("categories", {})
+
+
+def components(category):
+    return category.get("components", [])
+
+
+def all_components():
+    for key, category in categories.items():
+        for component in components(category):
+            yield key, category, component
+
+
+def text(value):
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value)
+    return str(value)
+
+
+def cmd(component):
+    return text(component.get("commands"))
+
+
+def summary():
+    print(f"ctfer manifest v{data.get('manifest_version', '?')} — "
+          f"{image.get('name', '?')} ({', '.join(image.get('platforms', []))})")
+    print(f"Base: {image.get('base', '?')}; workdir: {image.get('workdir', '?')}; "
+          f"ports: {text(image.get('exposed_ports')) or '-'}")
+    print()
+    print(f"Categories ({len(categories)}):")
+    for key, category in categories.items():
+        print(f"  {key:<12} {len(components(category)):>3} components  "
+              f"— {category.get('title', '')}")
+    print()
+    print("Usage:")
+    print("  ctf-manifest <category>            list components in a category")
+    print("  ctf-manifest search <term>         search names/commands/descriptions")
+    print("  ctf-manifest show <name>           show the full entry")
+    print("  ctf-manifest commands [category]   list command names")
+    print("  ctf-manifest json | raw            machine-readable output")
+    print()
+    print("Docs: /opt/ctf/TOOLS.md, /opt/ctf/AGENTS.md")
+
+
+def show_category(key):
+    category = categories.get(key)
+    if category is None:
+        print(f"ctf-manifest: unknown category '{key}'; "
+              f"available: {', '.join(categories)}", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"[{key}] {category.get('title', '')}")
+    description = category.get("description")
+    if description:
+        print(description)
+    print()
+    rows = components(category)
+    name_w = min(max((len(comp.get("name", "")) for comp in rows), default=0), 22)
+    cmd_w = min(max((len(cmd(comp)) for comp in rows), default=0), 42)
+    for comp in rows:
+        version = f"v{comp['version']} " if comp.get("version") else ""
+        optional = " [optional]" if comp.get("optional") else ""
+        print(f"  {comp.get('name', ''):<{name_w}}  {comp.get('kind', ''):<10} "
+              f"{cmd(comp):<{cmd_w}}  {version}{comp.get('description', '')}{optional}")
+
+
+def search(term):
+    needle = term.lower()
+    fields = ("name", "kind", "description", "version", "path", "package", "notes",
+              "use_when", "also_in", "python_modules", "commands")
+    hits = []
+    for key, category, comp in all_components():
+        haystack = " ".join(text(comp.get(field)) for field in fields).lower()
+        if needle in haystack:
+            hits.append((key, category, comp))
+    if not hits:
+        print(f"ctf-manifest: no component matches '{term}'", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"{len(hits)} match(es) for '{term}':")
+    for key, category, comp in hits:
+        print(f"  [{key}] {comp.get('name', ''):<20} {cmd(comp):<38} "
+              f"{comp.get('description', '')}")
+
+
+def show(name):
+    needle = name.lower()
+    exact = [(key, category, comp) for key, category, comp in all_components()
+             if comp.get("name", "").lower() == needle]
+    hits = exact or [(key, category, comp) for key, category, comp in all_components()
+                     if needle in comp.get("name", "").lower()]
+    if not hits:
+        print(f"ctf-manifest: no component named '{name}'", file=sys.stderr)
+        raise SystemExit(1)
+    for key, category, comp in hits:
+        print(f"# category: {key} ({category.get('title', '')})")
+        print(yaml.safe_dump(comp, sort_keys=False, allow_unicode=True,
+                             default_flow_style=False, width=120).rstrip())
+        print()
+
+
+def list_commands(category_filter=None):
+    for key, category, comp in all_components():
+        if category_filter and key != category_filter:
+            continue
+        for command in comp.get("commands", []):
+            print(f"{key}\t{comp.get('name', '')}\t{command}")
+
+
+if not args or args[0] in ("-h", "--help", "help"):
+    summary()
+    raise SystemExit(0)
+
+action = args[0]
+if action == "json":
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+elif action == "raw":
+    with open(path, encoding="utf-8") as fh:
+        sys.stdout.write(fh.read())
+elif action == "search":
+    if len(args) < 2:
+        print("usage: ctf-manifest search <term>", file=sys.stderr)
+        raise SystemExit(2)
+    search(" ".join(args[1:]))
+elif action == "show":
+    if len(args) < 2:
+        print("usage: ctf-manifest show <name>", file=sys.stderr)
+        raise SystemExit(2)
+    show(" ".join(args[1:]))
+elif action == "commands":
+    category_filter = args[1] if len(args) > 1 else None
+    if category_filter and category_filter not in categories:
+        print(f"ctf-manifest: unknown category '{category_filter}'", file=sys.stderr)
+        raise SystemExit(1)
+    list_commands(category_filter)
+elif action in categories:
+    show_category(action)
+else:
+    print(f"ctf-manifest: unknown action '{action}'", file=sys.stderr)
+    print("try: ctf-manifest --help", file=sys.stderr)
+    raise SystemExit(2)
+PY

@@ -3,13 +3,36 @@
 You are running inside a CTF workstation container. Most tools are already
 installed; **discover before installing**.
 
+## Discover components first
+
+The image ships a machine-readable manifest at `/opt/ctf/MANIFEST.yaml`. Use it
+before installing or guessing tool names:
+
+```sh
+ctf-manifest                         # categories and counts
+ctf-manifest pwn                     # all pwn components, commands and paths
+ctf-manifest web                     # web components
+ctf-manifest harness                 # pi / codex / dsh
+ctf-manifest search jwt              # search names, commands, descriptions
+ctf-manifest show gdb                # full manifest entry
+ctf-manifest commands ad             # command names as TSV
+ctf-manifest json                    # full JSON (pipe to jq)
+```
+
+Categories: `base`, `harness`, `web`, `pwn`, `reverse`, `crypto`,
+`forensics`, `stego`, `network`, `ad`, `cloud`, `data`, `helpers`.
+
+The human-readable catalog is `ctf-tools`; the manifest is the source of truth
+for command names, paths, Python modules and optional/absent tools.
+
 ## Layout
 
 | path | contents |
 |---|---|
 | `/work` | your workspace; persist notes and challenge files here |
 | `/work/handouts` | suggested location for downloaded attachments |
-| `/opt/ctf/TOOLS.md` | full tool catalog (`ctf-tools`) |
+| `/opt/ctf/MANIFEST.yaml` | machine-readable component manifest (`ctf-manifest`) |
+| `/opt/ctf/TOOLS.md` | human-readable tool catalog (`ctf-tools`) |
 | `/opt/seclists` | wordlists (`$SECLISTS`) |
 | `/opt/nuclei-templates` | nuclei templates (`$NUCLEI_TEMPLATES`) |
 | `/opt/venv` | Python 3.12 with pwntools/angr/z3/… (first on `PATH`) |
@@ -28,9 +51,9 @@ installed; **discover before installing**.
    platform, other teams, or infrastructure.
 5. **Never bake secrets into files.** API keys and flags belong in environment
    variables or the platform submission tool, not in `/work`.
-6. **Prefer the right tool.** Check `ctf-tools` and `command -v` before
-   downloading a replacement. Use `uv tool install`, `pipx`, `npm -g`, or
-   `go install` only when something is genuinely missing.
+6. **Prefer the right tool.** Check `ctf-manifest`/`ctf-tools` and
+   `command -v` before downloading a replacement. Use `uv tool install`,
+   `pipx`, `npm -g`, or `go install` only when something is genuinely missing.
 
 ## Quick checklists
 

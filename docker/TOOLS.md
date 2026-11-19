@@ -11,10 +11,28 @@ Environment:
 | Python | `/opt/venv/bin/python3` (first on `PATH`) |
 | Go | `/usr/local/go/bin/go` |
 | Ghidra | `$GHIDRA_HOME` (`/opt/ghidra`) |
-| helpers | `ctf-tools` (this file), `ctf-selftest` |
+| helpers | `ctf-tools` (this file), `ctf-selftest`, `ctf-manifest` |
 
 The image runs as root and is a toolkit, not a security boundary. Use it only
 against authorized targets.
+
+## Component manifest
+
+A machine-readable catalog lives at `/opt/ctf/MANIFEST.yaml`. It groups every
+component into categories (`base`, `harness`, `web`, `pwn`, `reverse`,
+`crypto`, `forensics`, `stego`, `network`, `ad`, `cloud`, `data`, `helpers`)
+and records commands, paths, packages, Python modules and optional flags.
+
+```sh
+ctf-manifest                         # category summary
+ctf-manifest pwn                     # components in one category
+ctf-manifest search angr             # search names/commands/descriptions
+ctf-manifest show gdb                # full entry
+ctf-manifest commands web            # command names as TSV
+ctf-manifest json | jq               # machine-readable
+```
+
+Agents should query the manifest before installing a replacement tool.
 
 ## Runtime toolchains
 
@@ -130,6 +148,7 @@ interactively. See `/opt/ctf/AGENTS.md` for agent-oriented conventions.
 | command | what it does |
 |---|---|
 | `ctf-tools` | print this catalog |
+| `ctf-manifest` | query the machine-readable component manifest |
 | `ctf-selftest` | verify the toolchain |
 | `gdb-gef` | GDB + GEF |
 | `ghidra-headless` | Ghidra `analyzeHeadless` |

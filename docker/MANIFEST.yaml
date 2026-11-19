@@ -1,0 +1,1048 @@
+schema_version: 1
+manifest_version: '1.0'
+updated: '2026-11-19'
+image:
+  name: kingfs/ctfer
+  repository: https://github.com/kingfs/ctfer
+  docker_hub: https://hub.docker.com/r/kingfs/ctfer
+  platforms:
+  - linux/amd64
+  base: ubuntu:24.04
+  workdir: /work
+  user: root
+  entrypoint: /usr/local/bin/ctfer-entrypoint
+  exposed_ports:
+  - 3080
+  docs:
+    manifest: /opt/ctf/MANIFEST.yaml
+    tools: /opt/ctf/TOOLS.md
+    agents: /opt/ctf/AGENTS.md
+  verify:
+    command: ctf-selftest
+    expected: SELFTEST OK
+  environment:
+    SECLISTS: /opt/seclists
+    WORDLISTS: /opt/seclists
+    NUCLEI_TEMPLATES: /opt/nuclei-templates
+    PLAYWRIGHT_BROWSERS_PATH: /opt/playwright
+    GHIDRA_HOME: /opt/ghidra
+    JAVA_HOME: /opt/jdk-25
+    GOROOT: /usr/local/go
+    GOPATH: /root/go
+    GOMODCACHE: /root/go/pkg/mod
+    UV_TOOL_DIR: /opt/uv-tools
+    UV_TOOL_BIN_DIR: /usr/local/bin
+  default_build:
+    runtime_versions:
+      python: '3.12'
+      node: '24'
+      go: 1.27.4
+      java: Temurin 25
+      ruby: '3.2'
+      ghidra: '12.2'
+      playwright: '1.65'
+      pi: 1.5.2
+      codex: 0.170.0
+      dsh: 0.2.2-rc.1
+      pnpm: 12.21.0
+      bun: 1.4.4
+    build_args:
+      WITH_GHIDRA: '1'
+      WITH_PLAYWRIGHT: '1'
+      WITH_JAVA: '1'
+      WITH_RUBY: '1'
+      WITH_SECLISTS: '1'
+      WITH_NUCLEI_TEMPLATES: '1'
+notes:
+- linux/amd64 only; CTF pwn tooling and most challenge platforms assume amd64.
+- Third-party CLI versions follow the upstream latest release at build time; runtime and agent versions are pinned in the
+  Dockerfile.
+- SageMath, Metasploit, GPU hashcat, and Windows RE suites are intentionally not included (size/licensing/drivers).
+- No API keys, flags, or private tokens are baked into the image.
+- Tools marked optional may be absent in slim builds (WITH_* build args) or when an upstream download fails.
+categories:
+  base:
+    title: 基础运行时与开发工具
+    description: OS、语言运行时、包管理器和日常 CLI；绝大多数题目都会用到。
+    components:
+    - name: ubuntu
+      kind: base
+      description: 基础镜像，glibc 2.39，兼容绝大多数 amd64 题目。
+      version: '24.04'
+    - name: python
+      kind: runtime
+      description: Python 3.12 venv，预装 CTF 常用库；uv/pipx 可按需安装额外 CLI。
+      version: '3.12'
+      commands:
+      - python3
+      - pip
+      path: /opt/venv
+      notes: python3 位于 PATH 首位；uv、pipx 也在 /opt/venv/bin。
+    - name: python-managers
+      kind: cli
+      description: 临时安装/隔离运行 Python CLI 的工具。
+      commands:
+      - uv
+      - pipx
+      path: /opt/venv/bin
+      use_when: manifest 中找不到所需 Python 工具时
+    - name: node
+      kind: runtime
+      description: Node.js 24；dsh 要求 Node >= 24.9。
+      version: '24'
+      commands:
+      - node
+      - npm
+      - npx
+    - name: pnpm
+      kind: package-manager
+      description: Node 包管理器。
+      version: 12.21.0
+      commands:
+      - pnpm
+    - name: bun
+      kind: runtime
+      description: Bun JavaScript 运行时/包管理器。
+      version: 1.4.4
+      commands:
+      - bun
+    - name: go
+      kind: runtime
+      description: Go 1.27 工具链，GOPATH=/root/go。
+      version: 1.27.4
+      commands:
+      - go
+      - gofmt
+      path: /usr/local/go
+    - name: java
+      kind: runtime
+      description: Temurin JDK 25；Ghidra 12 要求 Java 25。
+      version: Temurin 25
+      commands:
+      - java
+      - javac
+      path: /opt/jdk-25
+    - name: ruby
+      kind: runtime
+      description: Ruby 3.2 + RubyGems；承载 one_gadget/seccomp-tools/zsteg/evil-winrm。
+      version: '3.2'
+      commands:
+      - ruby
+      - gem
+    - name: c-toolchain
+      kind: toolchain
+      description: C/C++ 构建链。
+      commands:
+      - gcc
+      - g++
+      - make
+      - cmake
+      - pkg-config
+      - nasm
+      package: build-essential cmake nasm
+    - name: multilib
+      kind: toolchain
+      description: 32 位 x86 编译支持，pwn 题常用。
+      commands:
+      - gcc -m32
+      - g++ -m32
+      package: gcc-multilib g++-multilib libc6-dev-i386
+    - name: shell-utils
+      kind: suite
+      description: 日常 shell/文件/远程操作工具。
+      commands:
+      - git
+      - curl
+      - wget
+      - ssh
+      - scp
+      - rsync
+      - sshpass
+      - tmux
+      - vim
+      - less
+      - tree
+      - lsof
+      - htop
+      - file
+    - name: text-utils
+      kind: suite
+      description: 文本/JSON/搜索/十六进制辅助工具。
+      commands:
+      - jq
+      - yq
+      - rg
+      - fd
+      - fzf
+      - shellcheck
+      - xxd
+      - bc
+    - name: archive-utils
+      kind: suite
+      description: 压缩包处理。
+      commands:
+      - unzip
+      - zip
+      - 7z
+      - xz
+      - zstd
+      - bzip2
+      - gzip
+      - tar
+    - name: db-clients
+      kind: suite
+      description: 常见数据库客户端。
+      commands:
+      - sqlite3
+      - redis-cli
+      - mariadb
+      - psql
+    - name: openssl
+      kind: cli
+      description: TLS/证书/编码/哈希工具。
+      commands:
+      - openssl
+    - name: php
+      kind: runtime
+      description: PHP CLI；用于 PHP 反序列化与 phpggc 相关题目。
+      version: '8.3'
+      commands:
+      - php
+  harness:
+    title: AI Agent Harness
+    description: 三个 agent 执行体；API key 运行时注入，不写入镜像。
+    components:
+    - name: pi
+      kind: harness
+      description: Pi 极简可扩展 agent harness。
+      version: 1.5.2
+      commands:
+      - pi
+      package: '@earendil-works/pi-coding-agent'
+      use_when: 需要轻量交互式/打印模式 agent
+    - name: codex
+      kind: harness
+      description: OpenAI Codex CLI。
+      version: 0.170.0
+      commands:
+      - codex
+      package: '@openai/codex'
+      use_when: 需要 Codex 的编辑/执行工作流
+    - name: dsh
+      kind: harness
+      description: DeepSeek Harness CLI，也提供 Web UI。
+      version: 0.2.2-rc.1
+      commands:
+      - dsh
+      package: '@deepseek-ai/dsh'
+      notes: 'Web UI: dsh web --host 0.0.0.0 --port 3080 --no-open（容器已 EXPOSE 3080）。'
+  web:
+    title: Web 安全
+    description: Web 侦察、目录/参数发现、注入、JWT、浏览器自动化与源码审计。
+    components:
+    - name: ffuf
+      kind: cli
+      description: 高性能 Web fuzzer，目录/参数/虚拟主机爆破。
+      commands:
+      - ffuf
+      path: /usr/local/bin/ffuf
+    - name: feroxbuster
+      kind: cli
+      description: 递归内容发现。
+      commands:
+      - feroxbuster
+      path: /usr/local/bin/feroxbuster
+    - name: gobuster
+      kind: cli
+      description: 目录/DNS/vhost 爆破。
+      commands:
+      - gobuster
+    - name: dirsearch
+      kind: cli
+      description: 目录扫描；找不到命令时回退到 python3 -m dirsearch。
+      commands:
+      - dirsearch
+    - name: httpx
+      kind: cli
+      description: HTTP 探测：状态码、标题、技术栈、指纹。
+      commands:
+      - httpx
+      path: /usr/local/bin/httpx
+    - name: whatweb
+      kind: cli
+      description: Web 技术栈指纹。
+      commands:
+      - whatweb
+    - name: wafw00f
+      kind: cli
+      description: WAF 识别。
+      commands:
+      - wafw00f
+    - name: nikto
+      kind: cli
+      description: 经典 Web 配置/漏洞检查。
+      commands:
+      - nikto
+    - name: nuclei
+      kind: cli
+      description: 模板化漏洞扫描；模板位于 $NUCLEI_TEMPLATES。
+      commands:
+      - nuclei
+      path: /usr/local/bin/nuclei
+      notes: 模板路径 /opt/nuclei-templates（环境变量 NUCLEI_TEMPLATES）。
+    - name: sqlmap
+      kind: cli
+      description: SQL 注入自动化。
+      commands:
+      - sqlmap
+    - name: commix
+      kind: cli
+      description: 命令注入自动化。
+      commands:
+      - commix
+      path: /usr/local/bin/commix
+    - name: sstimap
+      kind: cli
+      description: SSTI 检测与利用。
+      commands:
+      - sstimap
+      path: /usr/local/bin/sstimap
+    - name: dalfox
+      kind: cli
+      description: XSS 扫描。
+      commands:
+      - dalfox
+      path: /usr/local/bin/dalfox
+    - name: xsstrike
+      kind: cli
+      description: XSS 扫描/利用。
+      commands:
+      - xsstrike
+      path: /usr/local/bin/xsstrike
+    - name: jwt_tool
+      kind: cli
+      description: JWT 解码、伪造与攻击。
+      commands:
+      - jwt_tool
+      path: /usr/local/bin/jwt_tool
+    - name: arjun
+      kind: cli
+      description: HTTP 参数发现。
+      commands:
+      - arjun
+    - name: graphw00f
+      kind: cli
+      description: GraphQL 引擎指纹。
+      commands:
+      - graphw00f
+      path: /usr/local/bin/graphw00f
+      optional: true
+      notes: 源码 clone 可能因上游网络失败而缺失，不影响核心自检。
+    - name: clairvoyance
+      kind: cli
+      description: GraphQL schema/字段枚举。
+      commands:
+      - clairvoyance
+    - name: ssrfmap
+      kind: cli
+      description: SSRF 探测与利用。
+      commands:
+      - ssrfmap
+      path: /usr/local/bin/ssrfmap
+    - name: mitmproxy
+      kind: cli
+      description: 交互式 HTTPS 代理/抓包。
+      commands:
+      - mitmproxy
+      - mitmdump
+      - mitmweb
+    - name: playwright
+      kind: runtime
+      description: Playwright + headless Chromium，SPA/DOM XSS/截图。
+      version: '1.65'
+      commands:
+      - playwright
+      path: /opt/playwright
+      optional: true
+      notes: 浏览器二进制在 /opt/playwright；WITH_PLAYWRIGHT=0 可裁剪。
+    - name: semgrep
+      kind: cli
+      description: 源码审计/秘密与危险 sink 搜索（独立 uv tool 环境）。
+      commands:
+      - semgrep
+      path: /opt/uv-tools/semgrep
+      notes: uv tool 安装，避免其 protobuf 依赖影响主 Python 环境。
+    - name: subfinder
+      kind: cli
+      description: 子域名枚举。
+      commands:
+      - subfinder
+      path: /usr/local/bin/subfinder
+    - name: katana
+      kind: cli
+      description: Web 爬虫/URL 收集。
+      commands:
+      - katana
+      path: /usr/local/bin/katana
+    - name: websocat
+      kind: cli
+      description: WebSocket 客户端。
+      commands:
+      - websocat
+      path: /usr/local/bin/websocat
+    - name: grpcurl
+      kind: cli
+      description: gRPC 客户端。
+      commands:
+      - grpcurl
+      path: /usr/local/bin/grpcurl
+    - name: phpggc
+      kind: cli
+      description: PHP 反序列化 gadget 链生成器。
+      commands:
+      - phpggc
+      path: /opt/phpggc/phpggc
+  pwn:
+    title: Pwn / 二进制利用
+    description: 调试、ELF/ROP、符号执行、跨架构运行与 32 位编译。
+    components:
+    - name: pwntools
+      kind: library
+      description: pwntools：ELF/ROP/shellcraft/tubes；pwn 与 checksec 命令。
+      commands:
+      - pwn
+      - checksec
+      package: pwntools
+      python_modules:
+      - pwn
+    - name: gdb
+      kind: cli
+      description: GDB、多架构 GDB、gdbserver；含 libc6-dbg 调试符号。
+      commands:
+      - gdb
+      - gdb-multiarch
+      - gdbserver
+    - name: gdb-gef
+      kind: wrapper
+      description: GDB + GEF 插件封装。
+      commands:
+      - gdb-gef
+      path: /usr/local/bin/gdb-gef
+      notes: 默认调试体验；未内置 pwndbg。
+    - name: checksec
+      kind: cli
+      description: ELF 缓解措施检查（apt/pwntools 均提供）。
+      commands:
+      - checksec
+    - name: patchelf
+      kind: cli
+      description: 修改 ELF interpreter/rpath，适配题目 libc。
+      commands:
+      - patchelf
+    - name: ROPgadget
+      kind: cli
+      description: ROP gadget 搜索。
+      commands:
+      - ROPgadget
+    - name: ropper
+      kind: cli
+      description: gadget 搜索/ROP 链辅助。
+      commands:
+      - ropper
+    - name: one_gadget
+      kind: cli
+      description: libc one-gadget 查找。
+      commands:
+      - one_gadget
+    - name: seccomp-tools
+      kind: cli
+      description: seccomp BPF 反汇编/分析。
+      commands:
+      - seccomp-tools
+    - name: pwninit
+      kind: cli
+      description: 用题目 libc 自动 patch 二进制。
+      commands:
+      - pwninit
+      path: /usr/local/bin/pwninit
+    - name: radare2
+      kind: cli
+      description: 反汇编/修补/r2pipe；pwn 与 reverse 通用。
+      commands:
+      - r2
+      - radare2
+      - rabin2
+      - rasm2
+      also_in:
+      - reverse
+    - name: angr
+      kind: library
+      description: 符号执行框架。
+      package: angr
+      python_modules:
+      - angr
+      also_in:
+      - reverse
+    - name: z3
+      kind: library
+      description: SMT 约束求解。
+      package: z3-solver
+      python_modules:
+      - z3
+      also_in:
+      - crypto
+    - name: binary-libs
+      kind: library
+      description: 二进制解析/汇编/模拟库。
+      python_modules:
+      - capstone
+      - keystone
+      - unicorn
+      - lief
+    - name: qemu-user
+      kind: cli
+      description: 用户态跨架构执行（qemu-x86_64、qemu-aarch64 等）。
+      commands:
+      - qemu-x86_64
+      - qemu-aarch64
+    - name: qemu-system
+      kind: cli
+      description: 系统级模拟，内核题常用。
+      commands:
+      - qemu-system-x86_64
+    - name: tracing
+      kind: cli
+      description: 系统调用/库调用跟踪。
+      commands:
+      - strace
+      - ltrace
+    - name: libc6-dbg
+      kind: data
+      description: glibc 调试符号与源码级调试支持。
+      path: /usr/lib/debug
+  reverse:
+    title: Reverse / 移动逆向
+    description: 静态/动态逆向、反编译、APK/Java 反序列化。
+    components:
+    - name: binutils
+      kind: suite
+      description: ELF 静态分析基础工具。
+      commands:
+      - objdump
+      - readelf
+      - nm
+      - strings
+      - addr2line
+      - size
+    - name: ghidra
+      kind: cli
+      description: Ghidra 12.2 headless 反编译/分析。
+      version: '12.2'
+      commands:
+      - ghidra-headless
+      path: /opt/ghidra
+      optional: true
+      notes: 需要 JDK 25；WITH_GHIDRA=0 可裁剪。
+    - name: jadx
+      kind: cli
+      description: Java/APK 反编译。
+      commands:
+      - jadx
+      path: /opt/jadx
+    - name: apktool
+      kind: cli
+      description: APK 解码/重建。
+      commands:
+      - apktool
+      path: /opt/apktool.jar
+    - name: dex2jar
+      kind: cli
+      description: DEX -> JAR 转换。
+      commands:
+      - dex2jar
+      path: /opt/dex2jar
+    - name: androguard
+      kind: library
+      description: APK/DEX/Manifest 分析库。
+      package: androguard
+      python_modules:
+      - androguard
+    - name: ysoserial
+      kind: cli
+      description: Java 反序列化 payload 生成。
+      commands:
+      - ysoserial
+      path: /opt/ysoserial-all.jar
+    - name: upx
+      kind: cli
+      description: 可执行文件压缩/脱壳辅助。
+      commands:
+      - upx
+  crypto:
+    title: Crypto / 密码学
+    description: 数论、SMT/格、RSA 攻击、哈希破解。
+    components:
+    - name: python-crypto
+      kind: library
+      description: Python 数学/密码库集合。
+      python_modules:
+      - z3
+      - sympy
+      - gmpy2
+      - fpylll
+      - flint
+      - Crypto
+      - Cryptodome
+      - jwt
+      - cryptography
+      - primefac
+      - factordb
+    - name: pari-gp
+      kind: cli
+      description: PARI/GP 数论计算。
+      commands:
+      - gp
+    - name: gmp-ecm
+      kind: cli
+      description: 椭圆曲线分解法。
+      commands:
+      - ecm
+    - name: singular
+      kind: cli
+      description: 多项式/代数计算；Ubuntu 提供 Singular 与 singular 两个名字。
+      commands:
+      - singular
+      - Singular
+    - name: RsaCtfTool
+      kind: cli
+      description: RSA 攻击自动化。
+      commands:
+      - RsaCtfTool
+      path: /opt/RsaCtfTool
+    - name: crypto-attacks
+      kind: library
+      description: CTF 密码攻击库（格、RSA、ECC 等）。
+      path: /opt/crypto-attacks
+      notes: 按需加入 PYTHONPATH：/opt/crypto-attacks。
+    - name: hashcat
+      kind: cli
+      description: CPU 哈希破解。
+      commands:
+      - hashcat
+      notes: 无 GPU 版本。
+    - name: john
+      kind: cli
+      description: John the Ripper CPU 哈希破解。
+      commands:
+      - john
+  forensics:
+    title: Forensics / 取证
+    description: 流量、内存、磁盘、文档、固件与日志分析。
+    components:
+    - name: tshark
+      kind: cli
+      description: Wireshark CLI 与 dumpcap。
+      commands:
+      - tshark
+      - dumpcap
+    - name: tcpdump
+      kind: cli
+      description: 抓包。
+      commands:
+      - tcpdump
+    - name: scapy
+      kind: library
+      description: Python 报文构造/解析。
+      package: scapy
+      python_modules:
+      - scapy
+    - name: volatility3
+      kind: cli
+      description: 内存取证。
+      commands:
+      - vol
+      python_modules:
+      - volatility3
+    - name: sleuthkit
+      kind: suite
+      description: 磁盘镜像分析。
+      commands:
+      - fls
+      - icat
+      - mmls
+      - fsstat
+      - img_cat
+      - blkcat
+    - name: ewf-tools
+      kind: suite
+      description: E01/Ex01 镜像处理。
+      commands:
+      - ewfinfo
+      - ewfexport
+      - ewfverify
+    - name: foremost
+      kind: cli
+      description: 文件 carving。
+      commands:
+      - foremost
+    - name: testdisk
+      kind: cli
+      description: 分区恢复与 photorec 文件恢复。
+      commands:
+      - testdisk
+      - photorec
+    - name: binwalk
+      kind: cli
+      description: 固件/嵌入文件识别与提取。
+      commands:
+      - binwalk
+    - name: exiftool
+      kind: cli
+      description: 元数据读写/分析。
+      commands:
+      - exiftool
+    - name: hashing
+      kind: suite
+      description: 取证哈希/相似度。
+      commands:
+      - hashdeep
+      - ssdeep
+    - name: oletools
+      kind: suite
+      description: Office/OLE 恶意文档分析。
+      commands:
+      - olevba
+      - oleid
+      - oleobj
+      - rtfobj
+      - mraptor
+    - name: qpdf
+      kind: cli
+      description: PDF 解密/修复/拆分。
+      commands:
+      - qpdf
+    - name: poppler-utils
+      kind: suite
+      description: PDF 文本/图像/信息提取。
+      commands:
+      - pdftotext
+      - pdfimages
+      - pdfinfo
+      - pdftoppm
+    - name: yara
+      kind: cli
+      description: YARA 规则扫描。
+      commands:
+      - yara
+      - yarac
+    - name: ffmpeg
+      kind: cli
+      description: 音视频转码/抽帧/频谱辅助。
+      commands:
+      - ffmpeg
+      - ffprobe
+    - name: sox
+      kind: cli
+      description: 音频处理与频谱生成。
+      commands:
+      - sox
+  stego:
+    title: Stego / 隐写
+    description: 图片、音频、二维码与文件隐写。
+    components:
+    - name: steghide
+      kind: cli
+      description: JPEG/其他载体隐写提取/嵌入。
+      commands:
+      - steghide
+    - name: zsteg
+      kind: cli
+      description: PNG/BMP LSB 隐写分析。
+      commands:
+      - zsteg
+    - name: stegseek
+      kind: cli
+      description: steghide 密码快速爆破。
+      commands:
+      - stegseek
+      optional: true
+    - name: pngcheck
+      kind: cli
+      description: PNG 结构校验/异常块检查。
+      commands:
+      - pngcheck
+    - name: imagemagick
+      kind: suite
+      description: 图像转换/通道/像素操作。
+      commands:
+      - convert
+      - identify
+      - mogrify
+    - name: zbar
+      kind: cli
+      description: 二维码/条码识别。
+      commands:
+      - zbarimg
+    - name: qrencode
+      kind: cli
+      description: 二维码生成。
+      commands:
+      - qrencode
+    - name: media
+      kind: suite
+      description: 音频/视频隐写辅助（sox、ffmpeg 亦在 forensics 分类）。
+      commands:
+      - sox
+      - ffmpeg
+  network:
+    title: Network / 隧道与横向
+    description: 扫描、连接、VPN、代理与隧道。
+    components:
+    - name: nmap
+      kind: cli
+      description: 端口/服务扫描与 NSE 脚本。
+      commands:
+      - nmap
+    - name: masscan
+      kind: cli
+      description: 高速端口扫描。
+      commands:
+      - masscan
+    - name: netcat
+      kind: cli
+      description: 原始 TCP/UDP 连接；含 ncat。
+      commands:
+      - nc
+      - ncat
+    - name: socat
+      kind: cli
+      description: 中继/端口转发/串口。
+      commands:
+      - socat
+    - name: telnet
+      kind: cli
+      description: 经典 telnet 客户端。
+      commands:
+      - telnet
+    - name: dnsutils
+      kind: suite
+      description: DNS 查询。
+      commands:
+      - dig
+      - nslookup
+      - host
+    - name: whois
+      kind: cli
+      description: 域名/IP 注册信息。
+      commands:
+      - whois
+    - name: traceroute
+      kind: cli
+      description: 路径追踪。
+      commands:
+      - traceroute
+    - name: iproute2
+      kind: suite
+      description: 路由/网络接口/套接字。
+      commands:
+      - ip
+      - ss
+    - name: net-tools
+      kind: suite
+      description: 传统网络工具。
+      commands:
+      - ifconfig
+      - netstat
+      - route
+    - name: ping
+      kind: cli
+      description: ICMP 连通性测试。
+      commands:
+      - ping
+      - ping6
+    - name: snmp
+      kind: suite
+      description: SNMP 查询。
+      commands:
+      - snmpwalk
+      - snmpget
+      - snmpset
+    - name: swaks
+      kind: cli
+      description: SMTP 测试。
+      commands:
+      - swaks
+    - name: sngrep
+      kind: cli
+      description: SIP 流量分析。
+      commands:
+      - sngrep
+    - name: mosquitto-clients
+      kind: suite
+      description: MQTT 发布/订阅。
+      commands:
+      - mosquitto_pub
+      - mosquitto_sub
+    - name: openvpn
+      kind: cli
+      description: OpenVPN 客户端。
+      commands:
+      - openvpn
+    - name: wireguard
+      kind: suite
+      description: WireGuard 工具。
+      commands:
+      - wg
+      - wg-quick
+    - name: proxychains4
+      kind: cli
+      description: 代理链。
+      commands:
+      - proxychains4
+    - name: chisel
+      kind: cli
+      description: HTTP 隧道。
+      commands:
+      - chisel
+      path: /usr/local/bin/chisel
+      optional: true
+    - name: ligolo
+      kind: cli
+      description: Ligolo-ng agent/proxy 隧道。
+      commands:
+      - ligolo-agent
+      - ligolo-proxy
+      optional: true
+    - name: suo5
+      kind: cli
+      description: HTTP 隧道工具。
+      commands:
+      - suo5
+      optional: true
+  ad:
+    title: Active Directory / Windows
+    description: AD 枚举、Kerberos、SMB/WinRM 与凭据导出。
+    components:
+    - name: impacket
+      kind: suite
+      description: Impacket 工具集（smbserver/secretsdump/psexec/wmiexec/ntlmrelayx 等）。
+      commands:
+      - impacket-smbserver
+      - impacket-secretsdump
+      - impacket-psexec
+      - impacket-wmiexec
+      - impacket-smbexec
+      - impacket-atexec
+      - impacket-dcomexec
+      - impacket-smbclient
+      - impacket-rpcdump
+      - impacket-lookupsid
+      - impacket-GetNPUsers
+      - impacket-GetUserSPNs
+      - impacket-ntlmrelayx
+      - impacket-ticketer
+      - impacket-goldenPac
+      - impacket-mssqlclient
+      - impacket-dpapi
+      path: /usr/local/bin
+    - name: certipy
+      kind: cli
+      description: AD CS 证书服务攻击。
+      commands:
+      - certipy
+    - name: bloodhound-python
+      kind: cli
+      description: BloodHound 数据采集。
+      commands:
+      - bloodhound-python
+    - name: evil-winrm
+      kind: cli
+      description: WinRM shell。
+      commands:
+      - evil-winrm
+    - name: samba-client
+      kind: suite
+      description: SMB/RPC 客户端。
+      commands:
+      - smbclient
+      - rpcclient
+      - smbstatus
+    - name: ldap-utils
+      kind: suite
+      description: LDAP 查询/修改。
+      commands:
+      - ldapsearch
+      - ldapmodify
+      - ldapadd
+      - ldapdelete
+      - ldapwhoami
+    - name: enum4linux-ng
+      kind: cli
+      description: SMB/AD 综合枚举。
+      commands:
+      - enum4linux-ng
+      path: /opt/enum4linux-ng
+  cloud:
+    title: Cloud / 容器
+    description: 云 API 与 Kubernetes。
+    components:
+    - name: kubectl
+      kind: cli
+      description: Kubernetes CLI。
+      commands:
+      - kubectl
+      path: /usr/local/bin/kubectl
+      optional: true
+    - name: aws
+      kind: cli
+      description: AWS CLI（隔离 uv tool 环境）。
+      commands:
+      - aws
+      path: /opt/uv-tools/awscli
+      optional: true
+  data:
+    title: 数据 / 字典 / 模板
+    description: 预置的字典、模板、浏览器与工具数据。
+    components:
+    - name: seclists
+      kind: data
+      description: 精选 SecLists 字典（密码、目录、DNS、用户名）。
+      path: /opt/seclists
+      notes: 环境变量 SECLISTS/WORDLISTS；完整列表可用 WITH_FULL_SECLISTS=1 构建。
+    - name: rockyou
+      kind: data
+      description: rockyou 字典，gzip 存放，按需解压。
+      path: /opt/seclists/Passwords/Leaked-Databases/rockyou.txt.gz
+    - name: nuclei-templates
+      kind: data
+      description: nuclei 模板仓库。
+      path: /opt/nuclei-templates
+      notes: 环境变量 NUCLEI_TEMPLATES。
+    - name: playwright-browsers
+      kind: data
+      description: Playwright Chromium headless shell 与 ffmpeg。
+      path: /opt/playwright
+      notes: 'binary: chrome-headless-shell（Playwright >= 1.50）。'
+  helpers:
+    title: 镜像内发现与自检
+    description: 查询组件、查看完整目录、验证工具链。
+    components:
+    - name: ctf-manifest
+      kind: wrapper
+      description: 按类别/关键词查询本 manifest；支持 json/raw 输出。
+      commands:
+      - ctf-manifest
+      path: /usr/local/bin/ctf-manifest
+      use_when: 不确定某工具是否已安装、需要命令名或分类时
+    - name: ctf-tools
+      kind: wrapper
+      description: 打印人类可读的完整工具目录（TOOLS.md）。
+      commands:
+      - ctf-tools
+      path: /usr/local/bin/ctf-tools
+    - name: ctf-selftest
+      kind: wrapper
+      description: 验证核心工具与 Python 模块；输出 SELFTEST OK。
+      commands:
+      - ctf-selftest
+      path: /usr/local/bin/ctf-selftest
