@@ -281,7 +281,10 @@ npm cache clean --force >/dev/null 2>&1 || true
 if command -v uv >/dev/null 2>&1; then
   uv tool install --python /usr/bin/python3 awscli || warn "awscli install failed"
   uv tool install --python /usr/bin/python3 semgrep || warn "semgrep install failed"
-  uv tool install --python /usr/bin/python3 netexec || warn "netexec install failed"
+  # NetExec is not published on PyPI; upstream ships it via git.
+  uv tool install --python /usr/bin/python3 \
+    --from "git+https://github.com/Pennyw0rth/NetExec" netexec \
+    || warn "netexec install failed"
   uv tool install --python /usr/bin/python3 bloodyad || warn "bloodyad install failed"
   uv tool install --python /usr/bin/python3 coercer || warn "coercer install failed"
 fi
