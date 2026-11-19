@@ -24,9 +24,28 @@ FROM ${UBUNTU_IMAGE} AS download-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Keep apt resilient. GitHub-hosted runners live in Azure and repeatedly timed
+# out on archive.ubuntu.com:80, which fails the whole image; prefer the Azure
+# mirror and fall back to the default host.
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' \
+      > /etc/apt/apt.conf.d/80-retries \
+ && set -eux \
+ && for host in azure.archive.ubuntu.com archive.ubuntu.com; do \
+      sed -i -E "s#http://(archive|security)\\.ubuntu\\.com/ubuntu#http://${host}/ubuntu#g" \
+        /etc/apt/sources.list.d/ubuntu.sources; \
+      rm -rf /var/lib/apt/lists/*; \
+      if apt-get update; then echo "apt mirror: ${host}"; break; fi; \
+      echo "apt mirror ${host} unusable" >&2; \
+    done
+
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      ca-certificates curl wget unzip zip tar xz-utils gzip bzip2 file jq git debconf \
+ && for attempt in 1 2 3; do \
+      apt-get install -y --no-install-recommends \
+        ca-certificates curl wget unzip zip tar xz-utils gzip bzip2 file jq git debconf \
+      && break; \
+      echo "apt install attempt ${attempt} failed" >&2; sleep 10; \
+    done \
+ && command -v curl >/dev/null \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* /tmp/*
 
