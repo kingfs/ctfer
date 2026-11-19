@@ -91,7 +91,7 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      python3 python3-venv python3-dev build-essential pkg-config \
+      python3 python3-venv python3-dev build-essential pkg-config cmake \
       libffi-dev libssl-dev libgmp-dev libmpfr-dev libmpc-dev \
       libxml2-dev libxslt1-dev zlib1g-dev libmagic-dev libpcap-dev \
       liblzma-dev libyara-dev libjpeg-dev libpng-dev libfreetype6-dev \
@@ -177,7 +177,7 @@ SHELL ["/bin/bash", "-c"]
 # (Windows reversing challenges).
 RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       | debconf-set-selections \
- && dpkg --add-architecture i386 \
+ && if [ "${TARGETARCH}" = "amd64" ]; then dpkg --add-architecture i386; fi \
  && apt-get update \
  && pkgs="ca-certificates curl wget git openssh-client sshpass rsync \
       bash less vim tmux tree procps psmisc lsof htop file debconf \
@@ -186,7 +186,6 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       netcat-openbsd ncat socat telnet net-tools dnsutils whois \
       traceroute iproute2 iputils-ping \
       build-essential make cmake pkg-config nasm \
-      gcc-multilib g++-multilib libc6-dev-i386 \
       gdb gdb-multiarch gdbserver libc6-dbg strace ltrace rlwrap valgrind \
       binutils patchelf binwalk upx-ucl \
       libssl3t64 libffi8 libgmp10 libmpfr6 libmpc3 libxml2 libxslt1.1 \
@@ -207,6 +206,7 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
       afl++ clang llvm lld \
       python3 python3-venv python3-dev sqlmap nikto whatweb gobuster checksec php-cli" \
  && if [ "${WITH_RUBY}" = "1" ]; then pkgs="$pkgs ruby ruby-dev"; fi \
+ && if [ "${TARGETARCH}" = "amd64" ]; then pkgs="$pkgs gcc-multilib g++-multilib libc6-dev-i386"; fi \
  && apt-get install -y --no-install-recommends $pkgs \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
@@ -222,8 +222,9 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
 # man pages above). If anything still fails, repair dpkg state here: a broken
 # dpkg would make the later `playwright install --with-deps` apt call fail.
 RUN apt-get update \
- && (apt-get install -y --no-install-recommends \
-       wine wine64 wine32:i386 apksigner zipalign ftp \
+ && (extras="wine wine64 apksigner zipalign ftp"; \
+     if [ "${TARGETARCH}" = "amd64" ]; then extras="$extras wine32:i386"; fi; \
+     apt-get install -y --no-install-recommends $extras \
      || { echo "WARN: optional apt tools unavailable; repairing dpkg state" >&2; \
           dpkg --configure -a || true; apt-get -f install -y || true; }) \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \

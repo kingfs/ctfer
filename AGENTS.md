@@ -15,13 +15,14 @@ publishes it to Docker Hub from GitHub Actions.
 | `docker/install-assets.sh` | GitHub Releases / Ghidra / JDK / wordlists |
 | `docker/install-runtime.sh` | gems, wrappers, Playwright, agent CLIs |
 | `docker/selftest.sh` | `ctf-selftest` |
-| `.github/workflows/docker.yml` | tag -> build amd64 -> smoke test -> Docker Hub push |
+| `.github/workflows/docker.yml` | tag -> preflight -> build amd64+arm64 -> smoke test -> multi-arch push |
 
 ## Release
 
-Do **not** build the full image locally (arm64 hosts go through QEMU and are
-far slower than CI). Push a semver tag and let GitHub Actions build, smoke-test
-and push:
+Do **not** build the amd64 image on an arm64 host (it goes through QEMU and is
+far slower than CI). An **arm64 build is native** there and is the fast way to
+validate a change. Otherwise push a semver tag and let GitHub Actions build,
+smoke-test and push:
 
 ```bash
 git push origin main
@@ -68,6 +69,10 @@ but those files only reach the published image on the next tag.
 - Never commit `.env`, API keys, Docker Hub tokens, flags, or private challenge
   data.
 - Only run the shipped tools against authorized targets.
-- Keep the image `linux/amd64`; platform tooling (`gcc-multilib`,
-  `qemu-system-x86`, pwn challenges) assumes amd64.
+- The image is multi-arch (`linux/amd64`, `linux/arm64`). amd64 is the full
+  target; the 32-bit x86 chain (`gcc-multilib`, `libc6-dev-i386`, `wine32`) and
+  `pwninit`/`kerbrute`/`craft-anything`/`stegseek` are amd64-only. Gate new
+  architecture-specific pieces on `${TARGETARCH}`.
+- Run `./scripts/preflight.py --arch both` before tagging: it checks package
+  names, Python/npm versions, release assets and manifest drift in ~2 minutes.
 - Prefer source-of-truth edits over duplicating package lists in docs.

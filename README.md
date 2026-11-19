@@ -10,7 +10,7 @@
 - **数据**：精选 SecLists、rockyou（gzip）、nuclei-templates、Ghidra、Playwright Chromium
 
 镜像发布在 Docker Hub：[`kingfs/ctfer`](https://hub.docker.com/r/kingfs/ctfer)。
-打 `v*` tag 后由 GitHub Actions 自动构建 `linux/amd64` 镜像、跑烟测并推送。
+打 `v*` tag 后由 GitHub Actions 自动构建 `linux/amd64` + `linux/arm64` 多架构镜像、跑烟测并推送。
 
 ## 快速使用
 
@@ -83,7 +83,7 @@ git push origin v0.1.0
 GitHub Actions 会：
 
 1. `lint`：ShellCheck 检查所有脚本；
-2. 构建 `linux/amd64` 镜像（BuildKit + GitHub Actions 层缓存）；
+2. 构建 `linux/amd64` 与 `linux/arm64` 镜像（各自 native runner，BuildKit 层缓存）；
 3. 在 runner 内加载镜像并执行 `ctf-selftest`、Python 模块导入、Node/Go/Agent 版本检查；
 4. 推送以下 tag 到 Docker Hub：
    - `v0.1.0`、`0.1.0`、`0.1`、`0`、`latest`
@@ -103,7 +103,7 @@ GitHub Actions 会：
 
 ## 构建
 
-CI 只构建 `linux/amd64`。本地构建：
+CI 构建 `linux/amd64` + `linux/arm64` 多架构 manifest。本地构建：
 
 ```bash
 # 推荐：在 amd64 机器上构建
@@ -113,8 +113,8 @@ docker buildx build --platform linux/amd64 --load -t kingfs/ctfer:dev docker
 ./scripts/build.sh
 ```
 
-> arm64 主机上的 `--platform linux/amd64` 会走 QEMU，apt/pip/npm 全部模拟执行，
-> 可能耗时数小时；日常请交给 GitHub Actions。
+> 在 arm64 主机上构建 `linux/arm64` 是原生速度；构建 `linux/amd64` 会走 QEMU，
+> 可能耗时数小时。日常请交给 GitHub Actions，或先跑 `./scripts/preflight.py`。
 
 ### 构建参数
 
@@ -186,7 +186,10 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
 
 ## 已知限制
 
-- **仅 amd64**：CTF 平台、大多数 pwn 题和 `gcc-multilib`/`qemu-system-x86` 都是 amd64 生态。
+- **多架构差异**：`linux/amd64` 是完整目标。`linux/arm64` 缺 32 位 x86 工具链
+  （`gcc-multilib`、`g++-multilib`、`libc6-dev-i386`、`wine32:i386`）以及上游仅发
+  amd64 的 `pwninit`、`kerbrute`、`craft-anything`、`stegseek`；其余工具在 arm64
+  上原生可用（Ghidra/JDK/jadx 是纯 Java，Go/Rust 工具上游有 arm64 资产）。
 - 不包含 SageMath、Metasploit、GPU hashcat、Windows RE 套件（体积/许可/驱动原因）。
   需要时在容器内用 `uv` / `pipx` / `npm` / `go install` 临时安装。
 - `wine`/`wine32` 依赖 i386 架构；若上游源缺少某个包，会在构建日志里 `WARN`，

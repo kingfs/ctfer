@@ -46,19 +46,41 @@ jobs:
 
       - name: Dockerfile check
         run: |
-          docker buildx build \
-            --check \
-            --platform linux/amd64 \
-            --file docker/Dockerfile \
-            docker
+          for platform in linux/amd64 linux/arm64; do
+            docker buildx build \
+              --check \
+              --platform "${platform}" \
+              --file docker/Dockerfile \
+              docker
+          done
+
+      # Catches bad package names, unresolved Python pins, missing release
+      # assets and selftest/manifest drift in ~2 minutes instead of after a
+      # 40-minute image build.
+      - name: Preflight (amd64 + arm64)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/preflight.py --arch both
 
   build:
-    name: build-and-push
+    name: build-${{ matrix.arch }}
     needs: lint
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Native runners for both architectures: no QEMU, so the arm64 build
+          # costs the same as the amd64 one. ubuntu-24.04-arm is available to
+          # public repositories; if it is not, swap in a runs-on with QEMU.
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
     env:
       IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/ctfer
+      ARCH_TAG: build-${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v7
 
@@ -76,52 +98,40 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=tag
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ inputs.image_tag || 'test' }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=sha,format=short,prefix=sha-
-
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build linux/amd64 image
+      - name: Build ${{ matrix.arch }} image
         uses: docker/build-push-action@v7
         with:
           context: docker
           file: docker/Dockerfile
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.ARCH_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
           build-args: |
             GO_VERSION=${{ env.GO_VERSION }}
             WITH_GHIDRA=${{ inputs.with_ghidra || '1' }}
             WITH_PLAYWRIGHT=1
             WITH_JAVA=1
             WITH_RUBY=1
-          cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }},ignore-error=true
           provenance: false
           sbom: false
 
-      - name: Smoke test
+      - name: Smoke test (${{ matrix.arch }})
         run: |
           set -euo pipefail
-          image="$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n1)"
-          echo "image: ${image}"
+          image="${IMAGE_NAME}:${ARCH_TAG}"
+          docker pull "${image}"
           docker image inspect "${image}" --format 'uncompressed size: {{.Size}} bytes'
           docker run --rm "${image}" ctf-selftest
           docker run --rm "${image}" bash -lc '
@@ -138,13 +148,48 @@ jobs:
             dsh --version
           '
 
-      - name: Push image
-        if: github.event_name == 'push' || inputs.push_image
+  release:
+    name: publish-multiarch
+    needs: build
+    if: github.event_name == 'push' || inputs.push_image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/ctfer
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ inputs.image_tag || 'test' }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=sha,format=short,prefix=sha-
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Join the two per-architecture images into one multi-arch manifest.
+      - name: Create multi-arch tags
         run: |
           set -euo pipefail
+          base="${{ secrets.DOCKERHUB_USERNAME }}/ctfer"
           printf '%s\n' "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
             [ -n "${tag}" ] || continue
-            echo "::group::docker push ${tag}"
-            docker push "${tag}"
+            echo "::group::merge ${tag}"
+            docker buildx imagetools create \
+              -t "${tag}" \
+              "${base}:build-amd64" \
+              "${base}:build-arm64"
+            docker buildx imagetools inspect "${tag}"
             echo "::endgroup::"
           done

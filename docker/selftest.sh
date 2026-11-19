@@ -31,7 +31,7 @@ for t in python3 pip node npm pnpm bun go \
          smbclient rpcclient \
          gcc g++ make nasm r2 hashcat john gp ecm singular \
          checksec ROPgadget vol \
-         pwninit chisel websocat grpcurl \
+         chisel websocat grpcurl \
          afl-fuzz clang lld rlwrap hydra pcapfix lftp \
          svmap protoc htpasswd redis-server valgrind \
          pi codex dsh uv pipx semgrep mitmdump dirsearch \
@@ -147,7 +147,7 @@ for t in kubectl aws ligolo-agent ligolo-proxy suo5 stegseek \
          RsaCtfTool xsstrike ssrfmap sstimap jwt_tool commix \
          enum4linux-ng graphw00f phpggc certipy bloodhound-python \
          impacket-smbserver \
-         wine apksigner zipalign ftp \
+         wine pwninit apksigner zipalign ftp \
          interactsh-client mc gitleaks kerbrute linpeas.sh \
          netexec bloodyAD coercer ast-grep js-beautify sshuttle \
          rea rea-agents craft-anything-cli jdwp-shellifier; do

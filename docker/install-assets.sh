@@ -27,8 +27,8 @@ WITH_KNOWLEDGE="${WITH_KNOWLEDGE:-1}"
 CRAFT_VERSION="${CRAFT_VERSION:-0.6.1}"
 
 case "$TARGETARCH" in
-  amd64) ARCH=amd64; ARCH_X=x86_64; BUN_ARCH=x64; JDK_ARCH=x64 ;;
-  arm64) ARCH=arm64; ARCH_X=aarch64; BUN_ARCH=aarch64; JDK_ARCH=aarch64 ;;
+  amd64) ARCH=amd64; ARCH_X=x86_64; BUN_ARCH=x64; JDK_ARCH=x64; GL_ARCH=x64 ;;
+  arm64) ARCH=arm64; ARCH_X=aarch64; BUN_ARCH=aarch64; JDK_ARCH=aarch64; GL_ARCH=arm64 ;;
   *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;;
 esac
 
@@ -181,7 +181,7 @@ fetch_release nicocha30/ligolo-ng "proxy_.*linux_${ARCH}\\.tar\\.gz$" "$tmp/ligo
   && install_tar_bin "$tmp/ligolo-proxy.tar.gz" proxy ligolo-proxy || warn "ligolo-proxy skipped"
 install_raw_bin zema1/suo5 "suo5-linux-${ARCH}$" suo5 || warn "suo5 skipped"
 install_raw_bin vi/websocat "websocat\\.${ARCH_X}-unknown-linux-musl$" websocat || warn "websocat skipped"
-fetch_release fullstorydev/grpcurl "linux_${ARCH_X}\\.tar\\.gz$" "$tmp/grpcurl.tar.gz" \
+fetch_release fullstorydev/grpcurl "linux_${ARCH}\\.tar\\.gz$" "$tmp/grpcurl.tar.gz" \
   && install_tar_bin "$tmp/grpcurl.tar.gz" grpcurl || warn "grpcurl skipped"
 
 log "interactsh-client / mc / gitleaks / kerbrute"
@@ -190,7 +190,7 @@ fetch_release projectdiscovery/interactsh "linux_${ARCH}\\.zip$" "$tmp/interacts
 # MinIO client. Note: deliberately NOT the apt package "mc" (Midnight Commander).
 # Release assets are named mc.linux-amd64.RELEASE.<timestamp>.
 install_raw_bin minio/mc "mc\\.linux-${ARCH}\\.RELEASE" mc || warn "mc skipped"
-fetch_release gitleaks/gitleaks "linux_x64\\.tar\\.gz$" "$tmp/gitleaks.tar.gz" \
+fetch_release gitleaks/gitleaks "linux_${GL_ARCH}\\.tar\\.gz$" "$tmp/gitleaks.tar.gz" \
   && install_tar_bin "$tmp/gitleaks.tar.gz" gitleaks || warn "gitleaks skipped"
 install_raw_bin ropnop/kerbrute "kerbrute_linux_${ARCH}$" kerbrute || warn "kerbrute skipped"
 
@@ -203,7 +203,11 @@ if [ -f "$OUT/bin/winPEASx64.exe" ]; then
 fi
 
 log "pwninit / yq / kubectl"
-install_raw_bin io12/pwninit "(^|/)pwninit$" pwninit || warn "pwninit skipped"
+if [ "$ARCH" = "amd64" ]; then
+  install_raw_bin io12/pwninit "(^|/)pwninit$" pwninit || warn "pwninit skipped"
+else
+  warn "pwninit skipped (upstream ships x86_64 only)"
+fi
 install_raw_bin mikefarah/yq "yq_linux_${ARCH}$" yq || warn "yq skipped"
 kver="$(curl -fsSL --retry 5 --connect-timeout 20 --max-time 30 https://dl.k8s.io/release/stable.txt 2>/dev/null || true)"
 if [ -n "$kver" ]; then

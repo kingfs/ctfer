@@ -7,6 +7,7 @@ image:
   docker_hub: https://hub.docker.com/r/kingfs/ctfer
   platforms:
   - linux/amd64
+  - linux/arm64
   base: ubuntu:24.04
   workdir: /work
   user: root
@@ -55,7 +56,9 @@ image:
       WITH_SECLISTS: '1'
       WITH_NUCLEI_TEMPLATES: '1'
 notes:
-- linux/amd64 only; CTF pwn tooling and most challenge platforms assume amd64.
+- Multi-arch linux/amd64 + linux/arm64. amd64 is the full target; arm64 lacks the
+  32-bit x86 chain (gcc-multilib, libc6-dev-i386, wine32) plus pwninit, kerbrute,
+  craft-anything and stegseek, which are amd64-only upstream or by nature.
 - Third-party CLI versions follow the upstream latest release at build time; runtime and agent versions are pinned in the
   Dockerfile.
 - SageMath, Metasploit, GPU hashcat, and Windows RE suites are intentionally not included (size/licensing/drivers).
