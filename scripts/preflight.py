@@ -60,7 +60,11 @@ def note(msg: str) -> None:
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    except FileNotFoundError:
+        fail(f"required command not found: {cmd[0]} (install it or run in CI)")
+        return subprocess.CompletedProcess(cmd, 127, "", f"{cmd[0]}: not found")
 
 
 def pkg_filter(tokens) -> list[str]:
@@ -273,7 +277,11 @@ def check_assets() -> None:
 
 def check_selftest() -> None:
     print("\n== selftest / manifest consistency ==")
-    import yaml  # noqa: PLC0415
+    try:
+        import yaml  # noqa: PLC0415
+    except ImportError:
+        fail("PyYAML is required for the manifest check (pip install pyyaml)")
+        return
 
     manifest = yaml.safe_load((DOCKER / "MANIFEST.yaml").read_text())
     commands: set[str] = set()

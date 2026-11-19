@@ -54,6 +54,12 @@ jobs:
               docker
           done
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install preflight deps
+        run: python3 -m pip install --user pyyaml
+
       # Catches bad package names, unresolved Python pins, missing release
       # assets and selftest/manifest drift in ~2 minutes instead of after a
       # 40-minute image build.
