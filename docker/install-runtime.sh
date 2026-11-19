@@ -204,19 +204,35 @@ fi
 if [ "$WITH_PLAYWRIGHT" = "1" ]; then
   log "Playwright"
   mkdir -p /opt/playwright
+  # A half-configured dpkg (e.g. from a best-effort apt step) makes
+  # `playwright install --with-deps` fail immediately with exit 100.
+  dpkg --configure -a >/dev/null 2>&1 || true
+
   playwright_ok=0
-  for attempt in 1 2 3; do
+  browser_present() {
+    find /opt/playwright -type f \
+      \( -name headless_shell -o -name chrome-headless-shell -o -name chrome \) \
+      2>/dev/null | grep -q .
+  }
+  for variant in "--with-deps --only-shell chromium" \
+                 "--only-shell chromium" \
+                 "--with-deps chromium"; do
+    # shellcheck disable=SC2086 # the variant is a deliberately split arg list
     if PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
-        /opt/venv/bin/playwright install --with-deps --only-shell chromium; then
-      playwright_ok=1
-      break
+        PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=180000 \
+        /opt/venv/bin/playwright install ${variant}; then
+      if browser_present; then
+        playwright_ok=1
+        break
+      fi
     fi
-    warn "playwright install attempt ${attempt} failed"
+    warn "playwright install '${variant}' failed"
   done
   if [ "$playwright_ok" != "1" ]; then
     warn "playwright browser install failed; ctf-selftest will report it"
   fi
   rm -rf /var/lib/apt/lists/* /var/cache/apt/* 2>/dev/null || true
+  mkdir -p /usr/share/man/man1 /usr/share/man/man8 /usr/share/doc
 fi
 
 # ---------------------------------------------------------------------------

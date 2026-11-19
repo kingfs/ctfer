@@ -188,7 +188,8 @@ log "interactsh-client / mc / gitleaks / kerbrute"
 fetch_release projectdiscovery/interactsh "linux_${ARCH}\\.zip$" "$tmp/interactsh.zip" \
   && install_zip_bin "$tmp/interactsh.zip" interactsh-client || warn "interactsh-client skipped"
 # MinIO client. Note: deliberately NOT the apt package "mc" (Midnight Commander).
-install_raw_bin minio/mc "(^|/)mc$" mc || warn "mc skipped"
+# Release assets are named mc.linux-amd64.RELEASE.<timestamp>.
+install_raw_bin minio/mc "mc\\.linux-${ARCH}\\.RELEASE" mc || warn "mc skipped"
 fetch_release gitleaks/gitleaks "linux_x64\\.tar\\.gz$" "$tmp/gitleaks.tar.gz" \
   && install_tar_bin "$tmp/gitleaks.tar.gz" gitleaks || warn "gitleaks skipped"
 install_raw_bin ropnop/kerbrute "kerbrute_linux_${ARCH}$" kerbrute || warn "kerbrute skipped"

@@ -147,7 +147,7 @@ for t in kubectl aws ligolo-agent ligolo-proxy suo5 stegseek \
          RsaCtfTool xsstrike ssrfmap sstimap jwt_tool commix \
          enum4linux-ng graphw00f phpggc certipy bloodhound-python \
          impacket-smbserver \
-         wine wine64 winPEASx64.exe apksigner zipalign ftp \
+         wine winPEASx64.exe apksigner zipalign ftp \
          interactsh-client mc gitleaks kerbrute linpeas.sh \
          netexec bloodyAD coercer ast-grep js-beautify sshuttle \
          rea rea-agents craft-anything-cli jdwp-shellifier; do

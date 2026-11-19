@@ -210,19 +210,26 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" \
  && apt-get install -y --no-install-recommends $pkgs \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
-           /usr/share/locale/* /tmp/* /var/tmp/*
+           /usr/share/locale/* /tmp/* /var/tmp/* \
+ && mkdir -p /usr/share/man/man1 /usr/share/man/man8 /usr/share/doc
 
 # --- best-effort apt extras ------------------------------------------------
 # These either need i386, or are missing/renamed on some Ubuntu mirrors. A
 # failure must not break the build: selftest reports them as optional.
+#
+# apksigner pulls a headless JRE whose post-install scripts update
+# alternatives under /usr/share/man, so the directory must exist (we prune the
+# man pages above). If anything still fails, repair dpkg state here: a broken
+# dpkg would make the later `playwright install --with-deps` apt call fail.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      wine wine64 wine32:i386 \
-      apksigner zipalign ftp \
- || echo "WARN: some optional apt tools (wine32/apksigner/zipalign/ftp) were unavailable" \
+ && (apt-get install -y --no-install-recommends \
+       wine wine64 wine32:i386 apksigner zipalign ftp \
+     || { echo "WARN: optional apt tools unavailable; repairing dpkg state" >&2; \
+          dpkg --configure -a || true; apt-get -f install -y || true; }) \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
            /usr/share/doc/* /usr/share/man/* /usr/share/info/* \
-           /usr/share/locale/* /tmp/* /var/tmp/*
+           /usr/share/locale/* /tmp/* /var/tmp/* \
+ && mkdir -p /usr/share/man/man1 /usr/share/man/man8 /usr/share/doc
 
 # --- copied runtimes and assets -------------------------------------------
 COPY --from=python /opt/venv /opt/venv

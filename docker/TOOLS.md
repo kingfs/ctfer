@@ -114,7 +114,7 @@ API keys are **not** baked into the image. Pass them at runtime, e.g.
 | `disassemble <bin> [func]` | Ghidra function-level disassembly → JSON |
 | `rea` | agent-native RE over MCP (pseudocode, xrefs, call graphs) |
 | `craft-anything-cli` | pure-Rust RE engine (early alpha) |
-| `wine`, `wine64` | run/debug Windows PE binaries |
+| `wine` | run/debug Windows PE binaries (32- and 64-bit via wine/wine32) |
 | `jadx`, `apktool`, `dex2jar`, `apksigner`, `zipalign` | Java/APK decompile, rebuild, sign |
 | `androguard` | APK / Manifest / DEX analysis |
 | `ysoserial` | Java deserialization payloads |

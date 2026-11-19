@@ -680,13 +680,12 @@ categories:
       - upx
     - name: wine
       kind: cli
-      description: Windows PE 运行时（含 wine32），用于动态运行/调试 Windows 逆向题。
+      description: Windows PE 运行时（wine 统一启动器，含 wine32），用于动态运行/调试 Windows 逆向题。
       commands:
       - wine
-      - wine64
-      package: wine wine64 wine32:i386
+      package: wine wine32:i386
       optional: true
-      notes: 构建期需要 i386 架构；缺失时不影响核心自检。
+      notes: 构建期需要 i386 架构；缺失时不影响核心自检。64 位 PE 直接用 `wine`。
     - name: ghidra-decompile
       kind: wrapper
       description: Ghidra headless 函数级反编译/反汇编，输出结构化 JSON（便于 agent 解析）。
