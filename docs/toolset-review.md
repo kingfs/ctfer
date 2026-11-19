@@ -350,13 +350,31 @@ ctfer 已有 `tmux` + `pwntools` + `pexpect`，`runtime-AGENTS.md` 也写了"一
 
 ---
 
-## 附录 C：本次落地记录（v0.2.2）
+## 附录 C：本次落地记录（v0.3.3）
 
 评审结论已全部实施，镜像由 GitHub Actions 构建（本地不构建）。
 
-发布状态：`v0.2.1` 为第一个构建+烟测+推送全部通过的版本（未压缩 4.25 GB）；
+发布状态：`v0.3.3` 为第一个 **多架构** 发布（`linux/amd64` + `linux/arm64` 同一 manifest，
+两端 `ctf-selftest` 均通过，registry 层大小 amd64 4.33 GB / arm64 3.72 GB）。
+`v0.2.1` 是第一个构建+烟测+推送全部通过的版本；
 `v0.2.0` 构建成功但烟测失败（Playwright 缺失，根因是清理 man 目录导致 dpkg 半配置），
-保留该 tag 作为失败记录；`v0.2.2` 修掉 NetExec 的包源与 winPEAS 的自检路径。
+保留该 tag 作为失败记录；`v0.2.2` 修掉 NetExec 的包源与 winPEAS 的自检路径；`v0.3.x` 引入双架构、构建前预检
+（`scripts/preflight.py`）与 apt 镜像回退。
+
+### C.1 多架构结论
+
+| 能力 | amd64 | arm64 | 说明 |
+|---|---|---|---|
+| Web / Pwn / Crypto / Forensics / Stego 主体 | ✅ | ✅ | 纯 Python/Java 或多架构二进制 |
+| ProjectDiscovery 全家桶、ffuf、chisel、ligolo、mc、yq、bun、suo5、dalfox | ✅ | ✅ | 上游有 arm64 资产 |
+| Ghidra / JDK / jadx / apktool / ysoserial | ✅ | ✅ | 纯 Java |
+| `gcc-multilib`、`g++-multilib`、`libc6-dev-i386` | ✅ | ❌ | i386 multilib 只存在于 amd64（32 位 x86 pwn 编译） |
+| `wine32:i386`（32 位 PE） | ✅ | ❌ | arm64 有 wine/wine64，但没有 i386 用户态 |
+| `pwninit`、`kerbrute`、`craft-anything`、`stegseek` | ✅ | ❌ | 上游只发 amd64 |
+| `keystone-engine`、`cysignals` | ✅ | ⚠️ 源码编译 | PyPI 无 aarch64 wheel（已加 cmake） |
+
+CI 用 native runner 双跑（`ubuntu-latest` + `ubuntu-24.04-arm`），再用
+`docker buildx imagetools create` 合并为一个多架构 manifest，全程不经过 QEMU。
 
 | 类别 | 新增内容 | 构建参数 |
 |---|---|---|
