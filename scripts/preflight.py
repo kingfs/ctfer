@@ -31,7 +31,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCKER = ROOT / "docker"
 
-ARCHIVE = "http://archive.ubuntu.com/ubuntu/dists"        # amd64, i386
+# archive.ubuntu.com returned Cloudflare 522s from GitHub runners; Azure VMs
+# get the Azure mirror first, with the canonical host as a fallback.
+ARCHIVE_BASES = (
+    "http://azure.archive.ubuntu.com/ubuntu/dists",
+    "http://archive.ubuntu.com/ubuntu/dists",
+)
 PORTS = "http://ports.ubuntu.com/ubuntu-ports/dists"      # arm64, armhf, ...
 SUITE = "noble"
 SUITES = (SUITE, f"{SUITE}-updates", f"{SUITE}-security")
@@ -40,7 +45,8 @@ COMPONENTS = ("main", "universe", "multiverse", "restricted")
 # shell words that appear inside the Dockerfile apt lists but are not packages
 NON_PACKAGES = {
     "apt-get", "install", "-y", "--no-install-recommends", "||", "&&", "{", "}",
-    "true", "fi", "then", "if", "echo",
+    "true", "fi", "then", "if", "echo", "done", "break", "sleep", "set",
+    "command", "attempt",
 }
 
 failures: list[str] = []
@@ -86,6 +92,10 @@ def apt_names_requested() -> dict[str, str]:
     if m:
         for tok in pkg_filter(m.group(1).split()):
             pkgs[tok] = "core"
+    # conditional appends such as: if [ "$TARGETARCH" = amd64 ]; then pkgs="$pkgs gcc-multilib"
+    for m in re.finditer(r'pkgs="\$pkgs ([^"]*)"', text):
+        for tok in pkg_filter(m.group(1).split()):
+            pkgs.setdefault(tok, "arch-specific")
     for block in re.finditer(
         r"apt-get install -y --no-install-recommends \\\n(.*?)(?:\n\n|\nRUN |\Z)", text, re.S
     ):
@@ -106,19 +116,26 @@ def apt_names_requested() -> dict[str, str]:
 
 
 def fetch_index(arch: str, suite: str, comp: str) -> set[str] | None:
-    base = PORTS if arch in {"arm64", "armhf", "ppc64el", "riscv64", "s390x"} else ARCHIVE
-    url = f"{base}/{suite}/{comp}/binary-{arch}/Packages.xz"
-    try:
-        with urllib.request.urlopen(url, timeout=120) as resp:
-            raw = lzma.decompress(resp.read())
-    except Exception as exc:  # noqa: BLE001
-        note(f"index fetch failed: {url} ({exc})")
-        return None
-    return {
-        line.split(": ", 1)[1].strip()
-        for line in raw.decode("utf-8", "replace").splitlines()
-        if line.startswith("Package: ")
-    }
+    if arch in {"arm64", "armhf", "ppc64el", "riscv64", "s390x"}:
+        bases = (PORTS,)
+    else:
+        bases = ARCHIVE_BASES
+    last: Exception | None = None
+    for base in bases:
+        url = f"{base}/{suite}/{comp}/binary-{arch}/Packages.xz"
+        for _attempt in range(2):
+            try:
+                with urllib.request.urlopen(url, timeout=120) as resp:
+                    raw = lzma.decompress(resp.read())
+                return {
+                    line.split(": ", 1)[1].strip()
+                    for line in raw.decode("utf-8", "replace").splitlines()
+                    if line.startswith("Package: ")
+                }
+            except Exception as exc:  # noqa: BLE001
+                last = exc
+    note(f"index fetch failed: {arch}/{suite}/{comp} ({last})")
+    return None
 
 
 def arch_index(arch: str) -> set[str] | None:
