@@ -1,0 +1,26 @@
+# Extra Python CTF libraries, installed one-by-one into /opt/venv by
+# install-runtime.sh.
+#
+# These are deliberately not in requirements-tools.txt: they pull larger or more
+# volatile dependency trees, and a resolver hiccup here must not break the core
+# pwn/crypto stack (pwntools, angr, z3). Each line is installed separately and
+# warn-only, so one bad pin cannot take the others down with it.
+
+# Python port of CyberChef: chained encode/decode/crypto/forensics operations.
+# Preinstalled by the NYU D-CIPHER agent environment.
+chepy>=4,<8
+
+# Python pickle (de)serialization analysis and exploitation.
+fickling>=0.1,<1
+
+# EVM / blockchain helpers (bb pins the 8.0.x line).
+web3>=7,<9
+
+# Elliptic-curve factoring helper used by some crypto challenges.
+pyecm>=0.0.1
+
+# Provides the js-beautify CLI (deobfuscating front-end JavaScript).
+jsbeautifier>=1.15,<2
+
+# Transparent proxy tunnel over SSH (complements chisel/ligolo).
+sshuttle>=1.1,<2

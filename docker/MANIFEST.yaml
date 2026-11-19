@@ -209,6 +209,18 @@ categories:
       version: '8.3'
       commands:
       - php
+    - name: clang-llvm
+      kind: toolchain
+      description: Clang/LLVM 工具链；提供 libFuzzer、ASan/UBSan，用于编译 fuzz harness。
+      commands:
+      - clang
+      - clang++
+      - llvm-config
+      - lld
+      package: clang llvm lld
+      also_in:
+      - pwn
+      use_when: 需要编译 fuzz harness 或带 sanitizer 的目标时
   harness:
     title: AI Agent Harness
     description: 三个 agent 执行体；API key 运行时注入，不写入镜像。
@@ -237,6 +249,22 @@ categories:
       - dsh
       package: '@deepseek-ai/dsh'
       notes: 'Web UI: dsh web --host "$(hostname -i | cut -d" " -f1)" --port 3080 --no-open --public-url http://127.0.0.1:3080（DSH 0.2.2 拒绝 0.0.0.0；容器已 EXPOSE 3080）。'
+    - name: rea
+      kind: mcp
+      description: REA — 面向 agent 的逆向工程 MCP 服务器/CLI，覆盖 native、JS/Electron、.NET、APK、固件、PCAP。
+      version: 6.9.0
+      commands:
+      - rea
+      - rea-agents
+      path: /usr/local/lib/node_modules/rea-agents
+      package: rea-agents
+      optional: true
+      also_in:
+      - reverse
+      - web
+      - forensics
+      use_when: 需要结构化逆向分析（伪代码/交叉引用/调用图）且 harness 支持 MCP 或 CLI 时
+      notes: 复用镜像内 Ghidra（GHIDRA_INSTALL_DIR）、JADX、apktool、binwalk、tshark、pwntools。已在构建期尝试注册 dsh/pi/codex。
   web:
     title: Web 安全
     description: Web 侦察、目录/参数发现、注入、JWT、浏览器自动化与源码审计。
@@ -403,6 +431,58 @@ categories:
       commands:
       - phpggc
       path: /opt/phpggc/phpggc
+    - name: interactsh-client
+      kind: cli
+      description: 带外（OOB）交互客户端，用于盲 SSRF/盲 XSS/盲命令注入。
+      commands:
+      - interactsh-client
+      path: /usr/local/bin/interactsh-client
+      optional: true
+      notes: 需要出网 DNS/HTTP；仅在授权目标上使用。
+    - name: fickling
+      kind: library
+      description: Python pickle 反序列化分析、插桩与利用。
+      package: fickling
+      python_modules:
+      - fickling
+      optional: true
+    - name: ast-grep
+      kind: cli
+      description: 结构化源码搜索（AST 匹配），用于快速定位 sink。
+      commands:
+      - ast-grep
+      - sg
+      package: '@ast-grep/cli'
+      optional: true
+    - name: js-beautify
+      kind: cli
+      description: 前端 JS 反混淆/格式化；分析打包产物与 source map。
+      commands:
+      - js-beautify
+      package: jsbeautifier
+      optional: true
+    - name: gitleaks
+      kind: cli
+      description: 源码/仓库密钥与凭据扫描。
+      commands:
+      - gitleaks
+      path: /usr/local/bin/gitleaks
+      optional: true
+    - name: ddddocr
+      kind: library
+      description: 验证码/截图 OCR（onnxruntime 后端），web 题高频。
+      package: ddddocr onnxruntime
+      python_modules:
+      - ddddocr
+      optional: true
+      notes: 构建期失败不阻塞；OMP_NUM_THREADS=4 限制线程数。
+    - name: apache2-utils
+      kind: suite
+      description: htpasswd/ab — 凭据文件生成解析与 HTTP 压测。
+      commands:
+      - htpasswd
+      - ab
+      package: apache2-utils
   pwn:
     title: Pwn / 二进制利用
     description: 调试、ELF/ROP、符号执行、跨架构运行与 32 位编译。
@@ -521,6 +601,25 @@ categories:
       kind: data
       description: glibc 调试符号与源码级调试支持。
       path: /usr/lib/debug
+    - name: afl
+      kind: cli
+      description: AFL++ 覆盖率引导 fuzz，用于找 crash / 定位解析器缺陷。
+      commands:
+      - afl-fuzz
+      - afl-gcc
+      - afl-clang-fast
+      package: afl++
+      notes: 与 clang/libFuzzer、ASan/UBSan 配合使用。
+    - name: rlwrap
+      kind: cli
+      description: 为 nc/交互式程序提供 readline（历史、补全），反弹 shell 升级。
+      commands:
+      - rlwrap
+    - name: valgrind
+      kind: cli
+      description: 内存错误/泄漏检测，pwn 与逆向辅助。
+      commands:
+      - valgrind
   reverse:
     title: Reverse / 移动逆向
     description: 静态/动态逆向、反编译、APK/Java 反序列化。
@@ -579,6 +678,33 @@ categories:
       description: 可执行文件压缩/脱壳辅助。
       commands:
       - upx
+    - name: wine
+      kind: cli
+      description: Windows PE 运行时（含 wine32），用于动态运行/调试 Windows 逆向题。
+      commands:
+      - wine
+      - wine64
+      package: wine wine64 wine32:i386
+      optional: true
+      notes: 构建期需要 i386 架构；缺失时不影响核心自检。
+    - name: ghidra-decompile
+      kind: wrapper
+      description: Ghidra headless 函数级反编译/反汇编，输出结构化 JSON（便于 agent 解析）。
+      commands:
+      - decompile
+      - disassemble
+      path: /usr/local/bin/decompile
+      optional: true
+      notes: 脚本来自 NYU CTF/D-CIPHER 工具集，已适配 /opt/ghidra 与 Ghidra 12。用法 `decompile <bin> [func]`。
+    - name: craft-anything
+      kind: cli
+      description: Craft Anything CLI — 纯 Rust 逆向引擎（原生/.NET/Java/Android/固件/PCAP），带 MCP。
+      version: 0.6.1
+      commands:
+      - craft-anything-cli
+      path: /opt/craft-anything/craft-anything-cli
+      optional: true
+      notes: 上游标注 early alpha；仅 amd64 有预编译包，失败不阻塞构建。
   crypto:
     title: Crypto / 密码学
     description: 数论、SMT/格、RSA 攻击、哈希破解。
@@ -636,6 +762,29 @@ categories:
       description: John the Ripper CPU 哈希破解。
       commands:
       - john
+    - name: chepy
+      kind: cli
+      description: Python 版 CyberChef：链式编码/加解密/取证操作，也可作为库导入。
+      commands:
+      - chepy
+      package: chepy
+      optional: true
+      also_in:
+      - forensics
+    - name: web3
+      kind: library
+      description: EVM/区块链交互库，用于区块链类赛题。
+      package: web3
+      python_modules:
+      - web3
+      optional: true
+      also_in:
+      - web
+    - name: pyecm
+      kind: library
+      description: 纯 Python 椭圆曲线分解（gmp-ecm 的补充实现）。
+      package: pyecm
+      optional: true
   forensics:
     title: Forensics / 取证
     description: 流量、内存、磁盘、文档、固件与日志分析。
@@ -747,6 +896,11 @@ categories:
       description: 音频处理与频谱生成。
       commands:
       - sox
+    - name: pcapfix
+      kind: cli
+      description: 修复损坏/截断的 pcap 文件，恢复后可被 tshark 解析。
+      commands:
+      - pcapfix
   stego:
     title: Stego / 隐写
     description: 图片、音频、二维码与文件隐写。
@@ -920,6 +1074,38 @@ categories:
       commands:
       - suo5
       optional: true
+    - name: hydra
+      kind: cli
+      description: 在线口令爆破（ssh/ftp/http-form/rdp 等）。
+      commands:
+      - hydra
+      use_when: 需要在线弱口令爆破时（离线破解用 hashcat/john）
+    - name: lftp
+      kind: cli
+      description: FTP/FTPS/SFTP 客户端，支持递归下载与镜像。
+      commands:
+      - lftp
+      - ftp
+      package: lftp ftp
+    - name: sipvicious
+      kind: suite
+      description: SIP 扫描/枚举/爆破（svmap、svwar、svcrack）。
+      commands:
+      - svmap
+      - svwar
+      - svcrack
+      package: sipvicious
+    - name: redis-server
+      kind: cli
+      description: 本地 Redis 服务端，用于复现 SSRF/gopher 打 Redis 类题目。
+      commands:
+      - redis-server
+    - name: sshuttle
+      kind: cli
+      description: 基于 SSH 的透明代理隧道（chisel/ligolo 之外的补充）。
+      commands:
+      - sshuttle
+      optional: true
   ad:
     title: Active Directory / Windows
     description: AD 枚举、Kerberos、SMB/WinRM 与凭据导出。
@@ -982,6 +1168,50 @@ categories:
       commands:
       - enum4linux-ng
       path: /opt/enum4linux-ng
+    - name: netexec
+      kind: cli
+      description: NetExec（nxc）— SMB/LDAP/WinRM/MSSQL 等协议的一体化 AD 工具。
+      commands:
+      - nxc
+      path: /opt/uv-tools/netexec
+      package: netexec
+      optional: true
+      notes: uv tool 隔离环境，避免与主 venv 的 impacket/urllib3 冲突。
+    - name: bloodyad
+      kind: cli
+      description: AD 写操作/权限提升工具（bloodyAD）。
+      commands:
+      - bloodyAD
+      path: /opt/uv-tools/bloodyad
+      package: bloodyad
+      optional: true
+    - name: coercer
+      kind: cli
+      description: 强制认证（coerce）工具，配合 NTLM relay 使用。
+      commands:
+      - coercer
+      path: /opt/uv-tools/coercer
+      package: coercer
+      optional: true
+    - name: kerbrute
+      kind: cli
+      description: Kerberos 用户枚举与口令喷洒。
+      commands:
+      - kerbrute
+      path: /usr/local/bin/kerbrute
+      optional: true
+    - name: linpeas
+      kind: cli
+      description: Linux 本地提权枚举脚本。
+      commands:
+      - linpeas.sh
+      path: /usr/local/bin/linpeas.sh
+      optional: true
+    - name: winpeas
+      kind: cli
+      description: Windows 本地提权枚举（在目标机上执行）。
+      path: /opt/peass/winPEASx64.exe
+      optional: true
   cloud:
     title: Cloud / 容器
     description: 云 API 与 Kubernetes。
@@ -999,6 +1229,13 @@ categories:
       commands:
       - aws
       path: /opt/uv-tools/awscli
+      optional: true
+    - name: mc
+      kind: cli
+      description: MinIO 客户端（S3 兼容对象存储），用于云存储类赛题。注意不是 Midnight Commander。
+      commands:
+      - mc
+      path: /usr/local/bin/mc
       optional: true
   data:
     title: 数据 / 字典 / 模板
@@ -1023,6 +1260,23 @@ categories:
       description: Playwright Chromium headless shell 与 ffmpeg。
       path: /opt/playwright
       notes: 'binary: chrome-headless-shell（Playwright >= 1.50）。'
+    - name: knowledge
+      kind: data
+      description: agent 可检索的攻防知识库（markdown，已剔除图片）：HackTricks、PayloadsAllTheThings、InternalAllTheThings。
+      path: /opt/knowledge
+      notes: 用 `rg` 检索；配合 ctf-manifest 使用。仅在授权目标上参考。
+    - name: fingerprints
+      kind: data
+      description: 常见产品默认路径、默认凭据与泄漏文件清单。
+      path: /opt/ctf/fingerprints.md
+      commands:
+      - ctf-fingerprints
+    - name: playbooks
+      kind: data
+      description: 分题型作战手册（web/pwn/reverse/crypto/forensics/stego/AD/多阶段）。
+      path: /opt/ctf/playbooks.md
+      commands:
+      - ctf-playbooks
   helpers:
     title: 镜像内发现与自检
     description: 查询组件、查看完整目录、验证工具链。
@@ -1040,6 +1294,18 @@ categories:
       commands:
       - ctf-tools
       path: /usr/local/bin/ctf-tools
+    - name: ctf-fingerprints
+      kind: wrapper
+      description: 打印常见产品指纹/默认路径/默认凭据清单。
+      commands:
+      - ctf-fingerprints
+      path: /usr/local/bin/ctf-fingerprints
+    - name: ctf-playbooks
+      kind: wrapper
+      description: 打印分题型作战手册。
+      commands:
+      - ctf-playbooks
+      path: /usr/local/bin/ctf-playbooks
     - name: ctf-selftest
       kind: wrapper
       description: 验证核心工具与 Python 模块；输出 SELFTEST OK。

@@ -22,6 +22,9 @@ WITH_JAVA="${WITH_JAVA:-1}"
 WITH_SECLISTS="${WITH_SECLISTS:-1}"
 WITH_FULL_SECLISTS="${WITH_FULL_SECLISTS:-0}"
 WITH_NUCLEI_TEMPLATES="${WITH_NUCLEI_TEMPLATES:-1}"
+WITH_CRAFT="${WITH_CRAFT:-1}"
+WITH_KNOWLEDGE="${WITH_KNOWLEDGE:-1}"
+CRAFT_VERSION="${CRAFT_VERSION:-0.6.1}"
 
 case "$TARGETARCH" in
   amd64) ARCH=amd64; ARCH_X=x86_64; BUN_ARCH=x64; JDK_ARCH=x64 ;;
@@ -33,7 +36,7 @@ log() { printf '\n==> %s\n' "$*"; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-mkdir -p "$OUT/bin" "$OUT/opt" "$OUT/seclists" "$OUT/nuclei-templates"
+mkdir -p "$OUT/bin" "$OUT/opt" "$OUT/seclists" "$OUT/nuclei-templates" "$OUT/knowledge"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -181,6 +184,23 @@ install_raw_bin vi/websocat "websocat\\.${ARCH_X}-unknown-linux-musl$" websocat 
 fetch_release fullstorydev/grpcurl "linux_${ARCH_X}\\.tar\\.gz$" "$tmp/grpcurl.tar.gz" \
   && install_tar_bin "$tmp/grpcurl.tar.gz" grpcurl || warn "grpcurl skipped"
 
+log "interactsh-client / mc / gitleaks / kerbrute"
+fetch_release projectdiscovery/interactsh "linux_${ARCH}\\.zip$" "$tmp/interactsh.zip" \
+  && install_zip_bin "$tmp/interactsh.zip" interactsh-client || warn "interactsh-client skipped"
+# MinIO client. Note: deliberately NOT the apt package "mc" (Midnight Commander).
+install_raw_bin minio/mc "(^|/)mc$" mc || warn "mc skipped"
+fetch_release gitleaks/gitleaks "linux_x64\\.tar\\.gz$" "$tmp/gitleaks.tar.gz" \
+  && install_tar_bin "$tmp/gitleaks.tar.gz" gitleaks || warn "gitleaks skipped"
+install_raw_bin ropnop/kerbrute "kerbrute_linux_${ARCH}$" kerbrute || warn "kerbrute skipped"
+
+log "PEASS-ng (linpeas / winPEAS)"
+mkdir -p "$OUT/opt/peass"
+install_raw_bin peass-ng/PEASS-ng "linpeas\\.sh$" linpeas.sh || warn "linpeas skipped"
+install_raw_bin peass-ng/PEASS-ng "winPEASx64\\.exe$" winPEASx64.exe || warn "winPEAS skipped"
+if [ -f "$OUT/bin/winPEASx64.exe" ]; then
+  mv "$OUT/bin/winPEASx64.exe" "$OUT/opt/peass/winPEASx64.exe"
+fi
+
 log "pwninit / yq / kubectl"
 install_raw_bin io12/pwninit "(^|/)pwninit$" pwninit || warn "pwninit skipped"
 install_raw_bin mikefarah/yq "yq_linux_${ARCH}$" yq || warn "yq skipped"
@@ -214,6 +234,52 @@ if [ "$TARGETARCH" = "amd64" ]; then
   else
     warn "stegseek skipped"
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# Optional: craft-anything (pure-Rust RE engine + CLI/MCP, early alpha)
+# ---------------------------------------------------------------------------
+if [ "$WITH_CRAFT" = "1" ]; then
+  log "craft-anything ${CRAFT_VERSION}"
+  if [ "$ARCH" = "amd64" ]; then
+    # Prefer the pinned version; fall back to whatever linux-x86_64 tarball the
+    # latest release ships, so a newer upstream release does not silently skip.
+    if ! fetch_release storytold/craft-anything \
+        "craft-anything-${CRAFT_VERSION}-linux-x86_64\\.tar\\.gz$" "$tmp/craft.tar.gz"; then
+      warn "craft-anything ${CRAFT_VERSION} asset not found; trying any linux-x86_64 build"
+      fetch_release storytold/craft-anything "linux-x86_64\\.tar\\.gz$" "$tmp/craft.tar.gz" \
+        || true
+    fi
+    if [ -s "$tmp/craft.tar.gz" ]; then
+      mkdir -p "$tmp/craft" "$OUT/opt/craft-anything"
+      tar -xzf "$tmp/craft.tar.gz" -C "$tmp/craft"
+      cbin="$(find "$tmp/craft" -type f -name 'craft-anything-cli' | head -n1)"
+      if [ -n "$cbin" ]; then
+        install -m 0755 "$cbin" "$OUT/opt/craft-anything/craft-anything-cli"
+      else
+        warn "craft-anything-cli not found in archive"
+      fi
+    else
+      warn "craft-anything skipped (no usable release asset)"
+    fi
+  else
+    warn "craft-anything skipped (no ${ARCH} build)"
+  fi
+fi
+
+log "suo5 endpoint assets / jdwp-shellifier"
+# The suo5 release only ships the client; the server-side shells live in the repo.
+if fetch_repo zema1/suo5 "$OUT/opt/suo5"; then
+  rm -rf "$OUT/opt/suo5/.git" "$OUT/opt/suo5/.github" 2>/dev/null || true
+else
+  warn "suo5 assets skipped"
+fi
+if fetch "https://raw.githubusercontent.com/IOActive/jdwp-shellifier/master/jdwp-shellifier.py" \
+     "$OUT/bin/jdwp-shellifier" 2>/dev/null; then
+  chmod 0755 "$OUT/bin/jdwp-shellifier"
+else
+  rm -f "$OUT/bin/jdwp-shellifier"
+  warn "jdwp-shellifier skipped"
 fi
 
 # ---------------------------------------------------------------------------
@@ -375,5 +441,30 @@ if [ "$WITH_NUCLEI_TEMPLATES" = "1" ]; then
          "$OUT/nuclei-templates/docs" 2>/dev/null || true
 fi
 
+# ---------------------------------------------------------------------------
+# Knowledge bases for agent retrieval (rg-friendly markdown, no images)
+# ---------------------------------------------------------------------------
+if [ "$WITH_KNOWLEDGE" = "1" ]; then
+  log "knowledge bases (HackTricks / PayloadsAllTheThings / InternalAllTheThings)"
+  for spec in \
+    "HackTricks-wiki/hacktricks:hacktricks" \
+    "swisskyrepo/PayloadsAllTheThings:PayloadsAllTheThings" \
+    "swisskyrepo/InternalAllTheThings:InternalAllTheThings"; do
+    repo="${spec%%:*}"
+    name="${spec##*:}"
+    if fetch_repo "$repo" "$OUT/knowledge/$name"; then
+      # Agents read markdown with rg; images and git metadata only cost space.
+      find "$OUT/knowledge/$name" -type d -name .git -prune -exec rm -rf '{}' + 2>/dev/null || true
+      find "$OUT/knowledge/$name" -type d -name .github -prune -exec rm -rf '{}' + 2>/dev/null || true
+      find "$OUT/knowledge/$name" -type f \
+        \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' \
+           -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.svg' \) -delete 2>/dev/null || true
+    else
+      warn "knowledge base skipped: $name"
+    fi
+  done
+fi
+
 log "done"
-du -sh "$OUT/bin" "$OUT/opt" "$OUT/seclists" "$OUT/nuclei-templates" 2>/dev/null || true
+du -sh "$OUT/bin" "$OUT/opt" "$OUT/seclists" "$OUT/nuclei-templates" \
+      "$OUT/knowledge" 2>/dev/null || true

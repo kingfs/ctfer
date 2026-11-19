@@ -2,9 +2,11 @@
 
 一个用于 CTF 比赛与 AI agent 实战的「开箱即用」Docker 镜像：
 
-- **开发运行时**：Python 3.12、Node.js 24（npm / pnpm / bun）、Go 1.27、JDK 25（Temurin）、Ruby 3.2
+- **开发运行时**：Python 3.12、Node.js 24（npm / pnpm / bun）、Go 1.27、JDK 25（Temurin）、Ruby 3.2、Clang/LLVM
 - **Agent harness**：[Pi](https://pi.dev)、[OpenAI Codex CLI](https://github.com/openai/codex)、[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（`pi` / `codex` / `dsh`）
-- **CTF 工具链**：Web、Pwn、Reverse、Crypto、Forensics/Stego、Network/AD、云原生等常用工具
+- **Agent 原生逆向**：[REA](https://github.com/morluto/rea)（`rea`，MCP 服务器 + CLI）、[Craft Anything](https://github.com/storytold/craft-anything)（`craft-anything-cli`，早期 alpha）
+- **CTF 工具链**：Web、Pwn/Fuzz、Reverse（含 Ghidra 函数级 JSON 反编译、wine 跑 PE）、Crypto、Forensics/Stego、Network/AD、云原生
+- **知识资产**：HackTricks / PayloadsAllTheThings / InternalAllTheThings（`/opt/knowledge`，可用 `rg` 检索）、`ctf-fingerprints`、`ctf-playbooks`
 - **数据**：精选 SecLists、rockyou（gzip）、nuclei-templates、Ghidra、Playwright Chromium
 
 镜像发布在 Docker Hub：[`kingfs/ctfer`](https://hub.docker.com/r/kingfs/ctfer)。
@@ -53,19 +55,19 @@ ctf-manifest json | jq               # 机器可读 JSON
 
 | 分类 | 内容 |
 |---|---|
-| `base` | OS、Python/Node/Go/JDK/Ruby、编译链、常用 CLI |
-| `harness` | `pi`、`codex`、`dsh` |
-| `web` | 目录/参数发现、注入、JWT、GraphQL、浏览器、源码审计 |
-| `pwn` | 调试、ELF/ROP、符号执行、qemu、32 位编译 |
-| `reverse` | Ghidra、jadx、apktool、dex2jar、androguard、ysoserial |
-| `crypto` | z3/sympy/gmpy2/fpylll、PARI/GP、RsaCtfTool、hashcat/john |
-| `forensics` | 流量、内存、磁盘、文档、固件 |
+| `base` | OS、Python/Node/Go/JDK/Ruby/Clang、编译链、常用 CLI |
+| `harness` | `pi`、`codex`、`dsh`、`rea`（MCP 逆向） |
+| `web` | 目录/参数发现、注入、JWT、GraphQL、OOB、浏览器、源码审计、OCR |
+| `pwn` | 调试、ELF/ROP、符号执行、**AFL++ fuzz**、qemu、32 位编译 |
+| `reverse` | Ghidra（含 `decompile`/`disassemble` JSON）、rea、craft-anything、**wine**、jadx、apktool |
+| `crypto` | z3/sympy/gmpy2/fpylll、PARI/GP、RsaCtfTool、chepy、web3、hashcat/john |
+| `forensics` | 流量（含 pcapfix 修复）、内存、磁盘、文档、固件 |
 | `stego` | 图片/音频/二维码隐写 |
-| `network` | 扫描、连接、VPN、代理、隧道 |
-| `ad` | impacket、certipy、bloodhound、evil-winrm、SMB/LDAP |
-| `cloud` | kubectl、aws |
-| `data` | SecLists、rockyou、nuclei 模板、Playwright 浏览器 |
-| `helpers` | `ctf-manifest`、`ctf-tools`、`ctf-selftest` |
+| `network` | 扫描、连接、hydra、FTP、SIP、VPN、代理、隧道 |
+| `ad` | impacket、nxc、bloodyAD、coercer、kerbrute、certipy、bloodhound、evil-winrm、PEASS |
+| `cloud` | kubectl、aws、mc（S3/MinIO） |
+| `data` | SecLists、rockyou、nuclei 模板、Playwright、**知识库、fingerprints、playbooks** |
+| `helpers` | `ctf-manifest`、`ctf-tools`、`ctf-selftest`、`ctf-fingerprints`、`ctf-playbooks` |
 
 > 说明：manifest 与 `ctf-manifest` 自 `v0.1.2` 起随镜像发布；更早的 `v0.1.1`
 > 只有 `ctf-tools` / `ctf-selftest`。不重建镜像时，也可以直接阅读仓库里的
@@ -126,6 +128,11 @@ docker buildx build --platform linux/amd64 --load -t kingfs/ctfer:dev docker
 | `WITH_SECLISTS` | `1` | 精选 SecLists + gzip rockyou |
 | `WITH_FULL_SECLISTS` | `0` | 完整 SecLists（很大，不建议） |
 | `WITH_NUCLEI_TEMPLATES` | `1` | nuclei 模板 |
+| `WITH_KNOWLEDGE` | `1` | HackTricks / PayloadsAllTheThings / InternalAllTheThings |
+| `WITH_REA` | `1` | REA 逆向 MCP 服务器（`rea-agents`，约 +180 MiB） |
+| `WITH_CRAFT` | `1` | Craft Anything CLI（约 +150–250 MB，早期 alpha） |
+| `WITH_OCR` | `1` | ddddocr + onnxruntime（验证码 OCR，失败不阻塞） |
+| `REA_VERSION` / `CRAFT_VERSION` | `6.9.0` / `0.6.1` | 两个 agent 逆向工具的钉版本 |
 | `PI_VERSION` / `CODEX_VERSION` / `DSH_VERSION` / `PNPM_VERSION` | 见 Dockerfile | agent harness / pnpm 版本 |
 
 示例：不要 Ghidra，缩小体积：
@@ -160,9 +167,13 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
 │   ├── Dockerfile                 # 多阶段构建
 │   ├── MANIFEST.yaml              # 机器可读组件清单（source of truth）
 │   ├── ctf-manifest               # 清单查询 CLI（ctf-manifest）
-│   ├── install-assets.sh          # GitHub Releases / 数据文件
-│   ├── install-runtime.sh         # gem、wrapper、Playwright、agent CLI
-│   ├── requirements-tools.txt     # Python CTF 工具链
+│   ├── install-assets.sh          # GitHub Releases / 数据文件 / 知识库
+│   ├── install-runtime.sh         # gem、wrapper、Playwright、agent CLI、rea
+│   ├── requirements-tools.txt     # Python CTF 工具链（核心）
+│   ├── requirements-extra.txt     # Python 扩展（chepy/fickling/web3/…，失败不阻塞）
+│   ├── ghidra-scripts/            # Ghidra 函数级 JSON 反编译脚本
+│   ├── fingerprints.md            # 产品指纹/默认凭据（ctf-fingerprints）
+│   ├── playbooks.md               # 分题型作战手册（ctf-playbooks）
 │   ├── TOOLS.md                   # 镜像内工具目录（ctf-tools）
 │   ├── runtime-AGENTS.md          # 镜像内 agent 约定（/opt/ctf/AGENTS.md）
 │   ├── selftest.sh                # ctf-selftest
@@ -178,6 +189,13 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
 - **仅 amd64**：CTF 平台、大多数 pwn 题和 `gcc-multilib`/`qemu-system-x86` 都是 amd64 生态。
 - 不包含 SageMath、Metasploit、GPU hashcat、Windows RE 套件（体积/许可/驱动原因）。
   需要时在容器内用 `uv` / `pipx` / `npm` / `go install` 临时安装。
+- `wine`/`wine32` 依赖 i386 架构；若上游源缺少某个包，会在构建日志里 `WARN`，
+  `ctf-selftest` 只把它列为 optional，不影响镜像可用性。
+- `rea`、`craft-anything-cli`、`nuclei-templates`、知识库、PEASS 等来自 GitHub Releases
+  或仓库克隆的工具属于 optional：上游网络失败时缺失，不阻塞构建。
+- `craft-anything` 上游自标 **early alpha**，行为可能随版本变化，已钉版本。
+- `decompile` / `disassemble` 依赖 Ghidra 能加载 Gson；若某版 Ghidra 不兼容，
+  自检会显示 optional 缺失，`ghidra-headless` 仍可用。
 - `john` 使用 Ubuntu 自带的 1.9.0（非 jumbo），仅支持 crypt(3) 类哈希；更多哈希格式
   请用 `hashcat`，或在容器内自行安装 jumbo 版。
 - 工具版本来自各项目 **latest release**（agent CLI 与 Go 固定版本），
@@ -185,8 +203,6 @@ CI 会打印镜像未压缩大小；Docker Hub 拉取时传输的是压缩层。
   增加版本变量即可。
 - Ghidra 12 需要 JDK 25；镜像从 Adoptium 下载 Temurin 25（Ubuntu 24.04 只有 21）。
 - 镜像不内置任何 API key、flag 或私有 token；所有密钥运行时注入。
-- `ctf-manifest` / `MANIFEST.yaml` 自 `v0.1.2` 起可用；`v0.1.1` 及更早镜像
-  没有这两个文件。
 - 少数 source-clone 工具（如 `graphw00f`）属于 optional，缺失不影响核心自检。
 
 ## 安全与合规

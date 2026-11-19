@@ -8,10 +8,14 @@ WITH_JAVA="${WITH_JAVA:-1}"
 WITH_RUBY="${WITH_RUBY:-1}"
 WITH_PLAYWRIGHT="${WITH_PLAYWRIGHT:-1}"
 WITH_GHIDRA="${WITH_GHIDRA:-1}"
+WITH_REA="${WITH_REA:-1}"
+WITH_CRAFT="${WITH_CRAFT:-1}"
 PI_VERSION="${PI_VERSION:-1.5.2}"
 CODEX_VERSION="${CODEX_VERSION:-0.170.0}"
 DSH_VERSION="${DSH_VERSION:-0.2.2-rc.1}"
 PNPM_VERSION="${PNPM_VERSION:-12.21.0}"
+REA_VERSION="${REA_VERSION:-6.9.0}"
+CRAFT_VERSION="${CRAFT_VERSION:-0.6.1}"
 
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 log() { printf '\n==> %s\n' "$*"; }
@@ -185,6 +189,13 @@ export JAVA_HOME
 exec /opt/ghidra/support/analyzeHeadless "$@"
 EOF
   chmod 0755 /usr/local/bin/ghidra-headless
+
+  # Function-level decompile/disassemble → JSON (vendored NYU CTF scripts).
+  for tool in decompile disassemble; do
+    if [ -f "/opt/ghidra/customScripts/${tool}.sh" ]; then
+      install -m 0755 "/opt/ghidra/customScripts/${tool}.sh" "/usr/local/bin/${tool}"
+    fi
+  done
 fi
 
 # ---------------------------------------------------------------------------
@@ -217,13 +228,68 @@ npm install -g --no-fund --no-audit --loglevel=error \
   "@openai/codex@${CODEX_VERSION}" \
   "@deepseek-ai/dsh@${DSH_VERSION}" \
   "pnpm@${PNPM_VERSION}"
+
+# ---------------------------------------------------------------------------
+# Agent-native RE: REA (MCP server, dsh/pi/codex aware) + craft-anything CLI
+# ---------------------------------------------------------------------------
+if [ "$WITH_REA" = "1" ]; then
+  log "REA ${REA_VERSION}"
+  if timeout 1200 npm install -g --no-fund --no-audit --loglevel=error \
+      "rea-agents@${REA_VERSION}"; then
+    # Register with the harnesses this image ships. Bounded + stdin closed:
+    # an unexpected interactive prompt must not hang the build.
+    if command -v rea >/dev/null 2>&1; then
+      timeout 180 rea setup --agent dsh --agent pi --agent codex --yes \
+        </dev/null >/dev/null 2>&1 \
+        || warn "rea installed but harness registration failed (run 'rea setup' manually)"
+    fi
+  else
+    warn "rea install failed"
+  fi
+fi
+
+if [ "$WITH_CRAFT" = "1" ] && [ -x /opt/craft-anything/craft-anything-cli ]; then
+  ln -sf /opt/craft-anything/craft-anything-cli /usr/local/bin/craft-anything-cli
+fi
+
+# JS/TS tooling that only ships as npm packages.
+log "ast-grep"
+npm install -g --no-fund --no-audit --loglevel=error @ast-grep/cli \
+  || warn "ast-grep install failed"
+
 npm cache clean --force >/dev/null 2>&1 || true
 
 # AWS CLI and semgrep are installed in isolated uv tool environments: their
 # pinned protobuf/urllib3 versions would otherwise break angr and the main venv.
+# netexec/bloodyad/coercer get the same treatment for the same reason.
 if command -v uv >/dev/null 2>&1; then
   uv tool install --python /usr/bin/python3 awscli || warn "awscli install failed"
   uv tool install --python /usr/bin/python3 semgrep || warn "semgrep install failed"
+  uv tool install --python /usr/bin/python3 netexec || warn "netexec install failed"
+  uv tool install --python /usr/bin/python3 bloodyad || warn "bloodyad install failed"
+  uv tool install --python /usr/bin/python3 coercer || warn "coercer install failed"
+fi
+
+# Extra Python CTF libraries (kept out of requirements-tools.txt so a resolver
+# hiccup cannot break the core pwn/crypto stack). Installed one package at a
+# time: a single bad pin must not prevent the others from being installed.
+if [ -f /tmp/requirements-extra.txt ]; then
+  log "Extra Python tools"
+  while IFS= read -r spec; do
+    case "$spec" in
+      ''|'#'*) continue ;;
+    esac
+    /opt/venv/bin/pip install --no-compile "$spec" \
+      || warn "pip install failed: $spec"
+  done < <(sed 's/[[:space:]]*#.*$//' /tmp/requirements-extra.txt)
+  rm -f /tmp/requirements-extra.txt
+fi
+
+# Captcha / screenshot OCR: heavy (onnxruntime) and frequently unavailable on
+# some mirrors, so it must not fail the build.
+if [ "${WITH_OCR:-1}" = "1" ]; then
+  /opt/venv/bin/pip install --no-compile ddddocr onnxruntime \
+    || warn "ddddocr/onnxruntime unavailable; OCR checks will be skipped"
 fi
 
 # ---------------------------------------------------------------------------
@@ -234,6 +300,18 @@ cat >/usr/local/bin/ctf-tools <<'EOF'
 exec cat /opt/ctf/TOOLS.md
 EOF
 chmod 0755 /usr/local/bin/ctf-tools
+
+cat >/usr/local/bin/ctf-fingerprints <<'EOF'
+#!/bin/sh
+exec cat /opt/ctf/fingerprints.md
+EOF
+chmod 0755 /usr/local/bin/ctf-fingerprints
+
+cat >/usr/local/bin/ctf-playbooks <<'EOF'
+#!/bin/sh
+exec cat /opt/ctf/playbooks.md
+EOF
+chmod 0755 /usr/local/bin/ctf-playbooks
 
 cat >/usr/local/bin/ctf-selftest <<'EOF'
 #!/bin/sh

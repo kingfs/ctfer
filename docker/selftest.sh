@@ -32,8 +32,10 @@ for t in python3 pip node npm pnpm bun go \
          gcc g++ make nasm r2 hashcat john gp ecm singular \
          checksec ROPgadget vol \
          pwninit chisel websocat grpcurl \
+         afl-fuzz clang lld rlwrap hydra pcapfix lftp \
+         svmap protoc htpasswd redis-server valgrind \
          pi codex dsh uv pipx semgrep mitmdump dirsearch \
-         ctf-tools ctf-manifest; do
+         ctf-tools ctf-manifest ctf-fingerprints ctf-playbooks; do
   need "$t"
 done
 
@@ -110,6 +112,15 @@ then
   missing=1
 fi
 
+echo "== optional python modules =="
+for mod in fickling web3 chepy ddddocr; do
+  if python3 -c "import ${mod}" >/dev/null 2>&1; then
+    printf 'ok   %s\n' "$mod"
+  else
+    printf 'opt  %s (missing)\n' "$mod"
+  fi
+done
+
 echo "== ruby tools =="
 if [ "${WITH_RUBY:-1}" = "1" ]; then
   for t in one_gadget seccomp-tools zsteg evil-winrm; do need "$t"; done
@@ -135,12 +146,19 @@ echo "== optional CLI =="
 for t in kubectl aws ligolo-agent ligolo-proxy suo5 stegseek \
          RsaCtfTool xsstrike ssrfmap sstimap jwt_tool commix \
          enum4linux-ng graphw00f phpggc certipy bloodhound-python \
-         impacket-smbserver; do
+         impacket-smbserver \
+         wine wine64 winPEASx64.exe apksigner zipalign ftp \
+         interactsh-client mc gitleaks kerbrute linpeas.sh \
+         netexec bloodyAD coercer ast-grep js-beautify sshuttle \
+         rea rea-agents craft-anything-cli jdwp-shellifier; do
   optional "$t"
 done
 
 if [ "${WITH_GHIDRA:-1}" = "1" ]; then
   need ghidra-headless
+  # Function-level JSON wrappers are optional: they depend on Ghidra scripts
+  # resolving Gson, which can differ between Ghidra releases.
+  for t in decompile disassemble; do optional "$t"; done
 fi
 
 if [ "${WITH_PLAYWRIGHT:-1}" = "1" ]; then
@@ -152,6 +170,19 @@ if [ "${WITH_PLAYWRIGHT:-1}" = "1" ]; then
     echo 'MISS playwright chromium headless shell'
     missing=1
   fi
+fi
+
+echo "== data assets =="
+for f in /opt/ctf/MANIFEST.yaml /opt/ctf/TOOLS.md /opt/ctf/fingerprints.md /opt/ctf/playbooks.md; do
+  if [ -f "$f" ]; then printf 'ok   %s\n' "$f"; else
+    printf 'MISS %s\n' "$f"; missing=1
+  fi
+done
+if [ -d /opt/knowledge ] && [ -n "$(ls -A /opt/knowledge 2>/dev/null)" ]; then
+  printf 'ok   /opt/knowledge (%s)\n' \
+    "$(find /opt/knowledge -mindepth 1 -maxdepth 1 -printf '%f ' 2>/dev/null)"
+else
+  echo 'opt  /opt/knowledge (empty or missing)'
 fi
 
 if [ "$missing" -eq 0 ]; then
