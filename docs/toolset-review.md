@@ -347,3 +347,31 @@ ctfer 已有 `tmux` + `pwntools` + `pexpect`，`runtime-AGENTS.md` 也写了"一
 - **不建议上 SWE-agent ACI 全套**：EnIGMA 的价值在"交互原语 + 输出治理"这两点，ctfer 已有 dsh/pi/codex 三个成熟 harness，只需补约定与薄封装，不必换框架。
 - **不建议装 CloudFox / 三家云 CLI / trivy 系**：真实渗透产品向，CTF 收益低、体积与依赖成本高。
 - **不建议装 Metasploit**：维持现有排除决策。
+
+---
+
+## 附录 C：本次落地记录（v0.2.0）
+
+评审结论已全部实施，镜像由 GitHub Actions 构建（本地不构建）。
+
+| 类别 | 新增内容 | 构建参数 |
+|---|---|---|
+| fuzz | `afl++`（`afl-fuzz`）、`clang`/`llvm`/`lld`（libFuzzer、ASan/UBSan） | 默认开 |
+| Windows PE | `wine`、`wine64`、`wine32:i386`（启用 i386 架构） | 默认开，best-effort |
+| Ghidra | `decompile` / `disassemble` 函数级 JSON 包装（`docker/ghidra-scripts/`） | 依赖 `WITH_GHIDRA=1` |
+| Agent 逆向 | `rea`（`rea-agents@6.9.0`，构建期注册 dsh/pi/codex）、`craft-anything-cli@0.6.1` | `WITH_REA` / `WITH_CRAFT` |
+| Web/OOB | `interactsh-client`、`fickling`、`ast-grep`、`js-beautify`、`gitleaks`、`ddddocr`、`htpasswd`/`ab` | 默认开 |
+| AD/内网 | `nxc`、`bloodyAD`、`coercer`、`kerbrute`、`hydra`、`lftp`、`sipvicious`、`redis-server`、`sshuttle`、`linpeas`/`winPEAS`、`rlwrap` | 默认开 |
+| Forensics/其他 | `pcapfix`、`valgrind`、`mc`（S3/MinIO）、suo5 端点资产、`jdwp-shellifier` | 默认开 |
+| Crypto | `chepy`、`web3`、`pyecm` | 默认开 |
+| 知识资产 | `/opt/knowledge`（HackTricks / PayloadsAllTheThings / InternalAllTheThings）、`ctf-fingerprints`、`ctf-playbooks` | `WITH_KNOWLEDGE=1` |
+
+Manifest：143 → 179 个组件。
+
+**设计原则**（避免"加一个工具炸一次构建"）：
+- 核心工具用严格 apt/pip；不确定或需联网的工具走 `|| warn`，缺失由 `ctf-selftest` 报 optional。
+- 额外 Python 依赖逐包安装：一个版本 pin 失败不会连坐其他包（`pyecm` 只有 0.0.x，曾差点拖垮整组）。
+- `netexec`/`bloodyAD`/`coercer` 走独立 uv tool 环境，避免污染 angr/pwntools 的依赖。
+- `rea setup` 与 npm 安装均加 `timeout` + `</dev/null`，防止交互式提示挂死构建。
+
+**仍未内置（维持评审结论）**：SageMath（~1.5GB）、Metasploit、GPU hashcat、Windows RE 套件、trivy/opengrep 等产品向扫描器。
